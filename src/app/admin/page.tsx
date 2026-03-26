@@ -419,7 +419,7 @@ export default function AdminDashboard() {
                                                                 style={{ opacity: score / 5 }} />
                                                         ))}
                                                         <span className="text-[10px] text-foreground/40 font-mono ml-1">
-                                                            {Object.values(user.vibe_scores || {}).reduce((a: any, b: any) => a + b, 0)}
+                                                            {Number(Object.values(user.vibe_scores || {}).reduce((a: any, b: any) => a + b, 0))}
                                                         </span>
                                                     </div>
                                                 </td>
