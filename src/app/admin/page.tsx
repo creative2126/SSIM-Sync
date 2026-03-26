@@ -9,6 +9,9 @@ import { motion } from "framer-motion";
 export default function AdminDashboard() {
     const router = useRouter();
     const [loading, setLoading] = useState(true);
+    const [isAuthorized, setIsAuthorized] = useState(false);
+    const [adminPassword, setAdminPassword] = useState("");
+    const [authError, setAuthError] = useState(false);
     const [pendingUsers, setPendingUsers] = useState<any[]>([]);
     const [broadcastTitle, setBroadcastTitle] = useState("");
     const [broadcastMessage, setBroadcastMessage] = useState("");
@@ -17,9 +20,28 @@ export default function AdminDashboard() {
     const [loadingStories, setLoadingStories] = useState(true);
 
     useEffect(() => {
-        fetchPendingVerifications();
-        fetchActiveStories();
+        const auth = localStorage.getItem("admin_auth");
+        if (auth === "true") {
+            setIsAuthorized(true);
+            fetchPendingVerifications();
+            fetchActiveStories();
+        } else {
+            setLoading(false);
+        }
     }, []);
+
+    const handleAuth = () => {
+        const correctPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "admin2026";
+        if (adminPassword === correctPassword) {
+            setIsAuthorized(true);
+            localStorage.setItem("admin_auth", "true");
+            fetchPendingVerifications();
+            fetchActiveStories();
+        } else {
+            setAuthError(true);
+            setTimeout(() => setAuthError(false), 2000);
+        }
+    };
 
     const fetchPendingVerifications = async () => {
         const { data: { session } } = await supabase.auth.getSession();
@@ -132,6 +154,53 @@ export default function AdminDashboard() {
     };
 
     if (loading) return <div className="min-h-screen bg-midnight flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
+
+    if (!isAuthorized) {
+        return (
+            <main className="min-h-screen bg-midnight flex items-center justify-center p-6">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-midnight pointer-events-none" />
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass-panel p-10 rounded-[2.5rem] border border-white/5 max-w-sm w-full relative z-10 shadow-2xl text-center"
+                >
+                    <div className="w-20 h-20 rounded-3xl bg-primary/20 flex items-center justify-center border border-primary/30 shadow-[0_0_30px_rgba(109,93,254,0.4)] mx-auto mb-8">
+                        <ShieldCheck className="w-10 h-10 text-primary" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-white mb-2">Admin Access</h1>
+                    <p className="text-foreground/40 text-sm mb-8">Enter the master password to continue</p>
+
+                    <div className="flex flex-col gap-4">
+                        <input
+                            type="password"
+                            value={adminPassword}
+                            onChange={(e) => setAdminPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAuth()}
+                            placeholder="Enter Password"
+                            autoFocus
+                            className={`w-full px-6 py-4 rounded-2xl bg-midnight border transition-all outline-none text-center font-bold tracking-[0.3em] ${authError ? "border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)]" : "border-white/10 focus:border-primary/50"
+                                }`}
+                        />
+                        <button
+                            onClick={handleAuth}
+                            className="w-full py-4 rounded-2xl bg-primary text-white font-bold text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-[0_10px_20px_rgba(109,93,254,0.3)] active:scale-95"
+                        >
+                            Unlock Dashboard
+                        </button>
+                        {authError && (
+                            <motion.p
+                                initial={{ opacity: 0, y: -10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="text-red-400 text-[10px] font-bold uppercase tracking-widest"
+                            >
+                                Incorrect Password
+                            </motion.p>
+                        )}
+                    </div>
+                </motion.div>
+            </main>
+        );
+    }
 
     return (
         <main className="min-h-screen bg-midnight p-8 overflow-y-auto">
