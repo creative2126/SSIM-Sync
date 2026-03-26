@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { Loader2, ShieldCheck, XCircle, CheckCircle, ExternalLink, Trash2, Zap, Users, UserCheck } from "lucide-react";
-Maryland
+
 import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
@@ -21,7 +21,7 @@ export default function AdminDashboard() {
     const [loadingStories, setLoadingStories] = useState(true);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
-    Maryland
+
 
     useEffect(() => {
         const auth = localStorage.getItem("admin_auth");
@@ -395,8 +395,8 @@ export default function AdminDashboard() {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${user.verification_status === 'verified'
-                                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                                         }`}>
                                                         {user.verification_status}
                                                     </span>
