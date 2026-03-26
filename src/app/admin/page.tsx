@@ -148,21 +148,30 @@ export default function AdminDashboard() {
 
                 {/* Vibe Moderator Section */}
                 <div className="mb-12">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
-                            <Zap className="w-5 h-5 text-primary" />
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                                <Zap className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Vibe Moderator</h2>
+                                <p className="text-foreground/40 text-xs">Remove harmful or inappropriate campus stories</p>
+                            </div>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-white">Vibe Moderator</h2>
-                            <p className="text-foreground/40 text-xs">Remove harmful or inappropriate campus stories</p>
-                        </div>
+                        <button
+                            onClick={fetchActiveStories}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all"
+                            title="Refresh Vibes"
+                        >
+                            <Loader2 className={`w-4 h-4 ${loadingStories ? 'animate-spin' : ''}`} />
+                        </button>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {loadingStories ? (
+                        {loadingStories && stories.length === 0 ? (
                             <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5">
                                 <Loader2 className="animate-spin text-primary w-6 h-6 mb-2" />
-                                <p className="text-[10px] text-foreground/30 font-bold uppercase tracking-widest">Loading active vibes...</p>
+                                <p className="text-[10px] text-foreground/30 font-bold uppercase tracking-widest">Scanning active vibes...</p>
                             </div>
                         ) : stories.length === 0 ? (
                             <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 italic text-foreground/30 text-sm">
@@ -174,7 +183,7 @@ export default function AdminDashboard() {
                                     key={story.id}
                                     initial={{ opacity: 0, scale: 0.95 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-4 group transition-all hover:bg-white/[0.07]"
+                                    className="p-5 rounded-2xl bg-white/5 border border-white/10 flex flex-col gap-4 transition-all hover:bg-white/[0.07]"
                                 >
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col">
@@ -183,7 +192,7 @@ export default function AdminDashboard() {
                                         </div>
                                         <button
                                             onClick={() => deleteStory(story.id)}
-                                            className="p-2 rounded-lg bg-red-500/10 text-red-400 opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white"
+                                            className="p-2 rounded-lg bg-red-500/10 text-red-400 transition-all hover:bg-red-500 hover:text-white border border-red-500/20"
                                             title="Delete Story"
                                         >
                                             <Trash2 className="w-4 h-4" />
