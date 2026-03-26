@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-midnight: #0B0E14;
+  --color-primary: #6D5DFE;
+  --color-indigo: #4F46E5;
+
+  --shadow-primary: 0 0 30px rgba(109, 93, 254, 0.3);
+}
+
+@layer base {
+  :root {
+    --safe-area-inset-bottom: env(safe-area-inset-bottom, 20px);
+  }
+
+  body {
+    @apply bg-midnight text-white antialiased selection:bg-primary/30;
+    -webkit-tap-highlight-color: transparent;
+    overflow-x: hidden;
+  }
+}
+
+@layer components {
+  .mobile-container {
+    @apply max-w-2xl mx-auto px-6 pb-[calc(var(--safe-area-inset-bottom)+80px)] pt-8 md:pt-24;
+  }
+
+  .glass-panel {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+}
+
+/* Fallback utilities for complex combinations */
+.bg-midnight {
+  background-color: #0B0E14;
+}
+
+.text-primary {
+  color: #6D5DFE;
+}
+
+.bg-primary {
+  background-color: #6D5DFE;
+}
