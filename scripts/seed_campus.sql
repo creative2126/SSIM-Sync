@@ -35,7 +35,7 @@ BEGIN
         VALUES (dummy_id, 'Demo Student F' || i, dummy_email, 'verified');
 
         -- 3. Create Public Profile with Diverse Aliases
-        INSERT INTO public.profiles_public (id, alias, gender, bio, vibe_scores)
+        INSERT INTO public.profiles_public (id, alias, gender, bio, vibe_scores, is_demo)
         VALUES (
             dummy_id,
             CASE 
@@ -63,7 +63,8 @@ BEGIN
                 'social', i % 5 + 1,
                 'intellect', i * 2 % 5 + 1,
                 'chill', i * 3 % 5 + 1
-            )
+            ),
+            true
         );
 
         -- 4. Seed an initial story for each
@@ -97,7 +98,7 @@ BEGIN
         VALUES (dummy_id, 'Demo Student M' || i, dummy_email, 'verified');
 
         -- 3. Create Public Profile
-        INSERT INTO public.profiles_public (id, alias, gender, bio, vibe_scores)
+        INSERT INTO public.profiles_public (id, alias, gender, bio, vibe_scores, is_demo)
         VALUES (
             dummy_id,
             CASE 
@@ -123,7 +124,8 @@ BEGIN
                 'social', i % 5 + 1,
                 'intellect', i * 2 % 5 + 1,
                 'chill', i * 3 % 5 + 1
-            )
+            ),
+            true
         );
 
         -- 4. Seed an initial story for each

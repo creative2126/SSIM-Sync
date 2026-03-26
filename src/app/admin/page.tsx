@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck, XCircle, CheckCircle, ExternalLink, Trash2, Zap } from "lucide-react";
+import { Loader2, ShieldCheck, XCircle, CheckCircle, ExternalLink, Trash2, Zap, Users, UserCheck } from "lucide-react";
+Maryland
 import { motion } from "framer-motion";
 
 export default function AdminDashboard() {
@@ -18,6 +19,9 @@ export default function AdminDashboard() {
     const [sendingBroadcast, setSendingBroadcast] = useState(false);
     const [stories, setStories] = useState<any[]>([]);
     const [loadingStories, setLoadingStories] = useState(true);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(true);
+    Maryland
 
     useEffect(() => {
         const auth = localStorage.getItem("admin_auth");
@@ -25,6 +29,7 @@ export default function AdminDashboard() {
             setIsAuthorized(true);
             fetchPendingVerifications();
             fetchActiveStories();
+            fetchUsers();
         } else {
             setLoading(false);
         }
@@ -37,10 +42,24 @@ export default function AdminDashboard() {
             localStorage.setItem("admin_auth", "true");
             fetchPendingVerifications();
             fetchActiveStories();
+            fetchUsers();
         } else {
             setAuthError(true);
             setTimeout(() => setAuthError(false), 2000);
         }
+    };
+
+    const fetchUsers = async () => {
+        setLoadingUsers(true);
+        const { data, error } = await supabase
+            .from("profiles_public")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+        if (!error && data) {
+            setAllUsers(data);
+        }
+        setLoadingUsers(false);
     };
 
     const fetchPendingVerifications = async () => {
@@ -279,6 +298,137 @@ export default function AdminDashboard() {
                                 </motion.div>
                             ))
                         )}
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                    {/* Real-time Stats */}
+                    <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Total Students</p>
+                            <Users className="w-4 h-4 text-primary" />
+                        </div>
+                        <p className="text-3xl font-black text-white">{allUsers.length}</p>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Real Students</p>
+                            <UserCheck className="w-4 h-4 text-emerald-400" />
+                        </div>
+                        <p className="text-3xl font-black text-white">{allUsers.filter(u => !u.is_demo).length}</p>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Demo Profiles</p>
+                            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                        </div>
+                        <p className="text-3xl font-black text-white">{allUsers.filter(u => u.is_demo).length}</p>
+                    </div>
+
+                    <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Pending Approval</p>
+                            <Loader2 className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <p className="text-3xl font-black text-white">{pendingUsers.length}</p>
+                    </div>
+                </div>
+
+                {/* Users List Section */}
+                <div className="mb-12">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                                <Users className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Campus Population</h2>
+                                <p className="text-foreground/40 text-xs">Directory of all active and demo students</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={fetchUsers}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
+                        >
+                            <Loader2 className={`w-3 h-3 ${loadingUsers ? 'animate-spin' : ''}`} />
+                            Sync List
+                        </button>
+                    </div>
+
+                    <div className="glass-panel rounded-[2rem] border border-white/5 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-white/5 border-b border-white/5">
+                                    <tr>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Student Alias</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Status</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Type</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Vibe Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {loadingUsers && allUsers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center">
+                                                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
+                                                <p className="text-xs text-foreground/30 font-bold uppercase tracking-widest">Fetching student data...</p>
+                                            </td>
+                                        </tr>
+                                    ) : allUsers.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-12 text-center italic text-foreground/30 text-sm">
+                                                No students found on campus.
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        allUsers.map((user) => (
+                                            <tr key={user.id} className="hover:bg-white/[0.02] transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs border border-primary/20">
+                                                            {user.alias?.[0]}
+                                                        </div>
+                                                        <span className="font-bold text-white text-sm">{user.alias}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${user.verification_status === 'verified'
+                                                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                            : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                        }`}>
+                                                        {user.verification_status}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {user.is_demo ? (
+                                                        <span className="px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 text-[9px] font-black uppercase tracking-wider">
+                                                            Demo
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-1 rounded-lg bg-white/5 text-white/40 border border-white/10 text-[9px] font-black uppercase tracking-wider">
+                                                            Real
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-1.5">
+                                                        {Object.values(user.vibe_scores || {}).map((score: any, idx) => (
+                                                            <div key={idx} className="w-1.5 h-1.5 rounded-full bg-primary/30"
+                                                                style={{ opacity: score / 5 }} />
+                                                        ))}
+                                                        <span className="text-[10px] text-foreground/40 font-mono ml-1">
+                                                            {Object.values(user.vibe_scores || {}).reduce((a: any, b: any) => a + b, 0)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
