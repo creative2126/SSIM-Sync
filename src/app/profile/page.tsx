@@ -57,25 +57,6 @@ export default function ProfilePage() {
         const cleanAlias = alias.toLowerCase().trim();
         const myRealName = privateProfile?.real_name?.toLowerCase() || "";
 
-        // 1. Check against own real name
-        if (cleanAlias === myRealName || cleanAlias.includes(myRealName) || (myRealName.length > 3 && myRealName.includes(cleanAlias))) {
-            setAliasError("You cannot use your real name as your alias.");
-            setSaving(false);
-            return;
-        }
-
-        // 2. Check against others' real names
-        const { data: collision } = await supabase
-            .from("profiles_private")
-            .select("id")
-            .ilike("real_name", `%${cleanAlias}%`)
-            .limit(1);
-
-        if (collision && collision.length > 0) {
-            setAliasError("This alias is too similar to a student's real name.");
-            setSaving(false);
-            return;
-        }
 
         const { error } = await supabase
             .from("profiles_public")
@@ -150,7 +131,7 @@ export default function ProfilePage() {
                                 {aliasError ? (
                                     <p className="text-[10px] text-red-400 font-bold ml-1">{aliasError}</p>
                                 ) : (
-                                    <p className="text-[10px] text-foreground/20 italic ml-1">This is your identity in Discovery and Vibes. No real names allowed.</p>
+                                    <p className="text-[10px] text-foreground/20 italic ml-1">This is your identity in Discovery and Vibes.</p>
                                 )}
                             </div>
 

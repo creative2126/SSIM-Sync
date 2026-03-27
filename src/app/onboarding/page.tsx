@@ -94,29 +94,6 @@ export default function OnboardingPage() {
             setLoading(true);
             setAliasError(null);
 
-            // 1. Check against own real name (from session metadata or private profile)
-            const meta = session?.user.user_metadata || {};
-            const myRealName = meta.full_name?.toLowerCase() || "";
-            const cleanAlias = alias.toLowerCase().trim();
-
-            if (cleanAlias === myRealName || cleanAlias.includes(myRealName) || (myRealName.length > 3 && myRealName.includes(cleanAlias))) {
-                setAliasError("You cannot use your real name (or parts of it) as your alias.");
-                setLoading(false);
-                return;
-            }
-
-            // 2. Check against others' real names
-            const { data: collision } = await supabase
-                .from("profiles_private")
-                .select("id")
-                .ilike("real_name", `%${cleanAlias}%`)
-                .limit(1);
-
-            if (collision && collision.length > 0) {
-                setAliasError("This alias is similar to a student's real name. Please choose something more unique.");
-                setLoading(false);
-                return;
-            }
             setLoading(false);
         }
         setStep(s => Math.min(s + 1, 3));
@@ -270,7 +247,7 @@ export default function OnboardingPage() {
                                     {aliasError ? (
                                         <p className="text-xs text-red-400 font-bold">{aliasError}</p>
                                     ) : (
-                                        <p className="text-xs text-primary/80">No real names (yours or others) allowed.</p>
+                                        <p className="text-xs text-primary/80">Choose a name that represents your campus vibe.</p>
                                     )}
                                 </div>
 
