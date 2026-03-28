@@ -81,11 +81,12 @@ export default function FeedPage() {
             // 2. Strict Heterosexual matching filter
             const targetGender = myProfile.gender === "Male" ? "Female" : "Male";
 
-            // 3. Get existing matches AND blocks to exclude
-            const [{ data: existingMatches }, { data: myBlocks }, { data: blockedMe }] = await Promise.all([
+            // 3. Get existing matches, blocks, AND passes to exclude
+            const [{ data: existingMatches }, { data: myBlocks }, { data: blockedMe }, { data: myPasses }] = await Promise.all([
                 supabase.from("matches").select("user_1_id, user_2_id").or(`user_1_id.eq.${session.user.id},user_2_id.eq.${session.user.id}`),
                 supabase.from("blocks").select("blocked_id").eq("blocker_id", session.user.id),
-                supabase.from("blocks").select("blocker_id").eq("blocked_id", session.user.id)
+                supabase.from("blocks").select("blocker_id").eq("blocked_id", session.user.id),
+                supabase.from("feed_passes").select("target_id").eq("user_id", session.user.id)
             ]);
 
             const excludedIds = new Set<string>();
@@ -97,6 +98,7 @@ export default function FeedPage() {
             });
             myBlocks?.forEach(b => excludedIds.add(b.blocked_id));
             blockedMe?.forEach(b => excludedIds.add(b.blocker_id));
+            myPasses?.forEach(p => excludedIds.add(p.target_id));
 
             const { data: potentialMatches } = await supabase
                 .from("profiles_public")
@@ -146,6 +148,7 @@ export default function FeedPage() {
     const skipProfile = () => handleAction("pass");
     const handleAction = async (action: "like" | "pass") => {
         if (currentIndex >= profiles.length) return;
+        const targetProfile = profiles[currentIndex];
 
         if (action === "like") {
             if (initiationsToday >= 3) {
@@ -153,7 +156,6 @@ export default function FeedPage() {
                 return;
             }
 
-            const targetProfile = profiles[currentIndex];
             const { error } = await supabase
                 .from("matches")
                 .insert({
@@ -166,6 +168,12 @@ export default function FeedPage() {
                 setMatchModal(targetProfile);
                 setInitiationsToday(prev => prev + 1);
             }
+        } else if (action === "pass") {
+            // Persistent rejection
+            await supabase.from("feed_passes").insert({
+                user_id: currentUser.id,
+                target_id: targetProfile.id
+            });
         }
 
         setCurrentIndex(prev => prev + 1);

@@ -59,16 +59,18 @@ export default function BroadcastBanner() {
                 initial={{ height: 0, opacity: 0 }}
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                className="fixed top-0 left-0 right-0 z-[200] bg-primary/20 backdrop-blur-md border-b border-primary/30 shadow-2xl"
+                className="fixed top-0 left-0 right-0 z-[200] bg-primary/25 backdrop-blur-xl border-b border-primary/30 shadow-2xl safe-top"
             >
-                <div className="mobile-container py-3 px-6 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                <div className="mobile-container py-4 px-6 flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
                             <Bell className="w-4 h-4 text-primary animate-bounce" />
                         </div>
                         <div className="flex flex-col">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary leading-none mb-1">Campus Broadcast</h4>
-                            <p className="text-xs font-bold text-white line-clamp-1">{broadcast.title}: <span className="font-medium text-foreground/70">{broadcast.message}</span></p>
+                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary leading-none mb-1.5">Campus Broadcast</h4>
+                            <p className="text-xs font-bold text-white leading-relaxed">
+                                {broadcast.title}: <span className="font-medium text-foreground/70">{broadcast.message}</span>
+                            </p>
                         </div>
                     </div>
                     <button

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck, XCircle, CheckCircle, ExternalLink, Trash2, Zap, Users, UserCheck } from "lucide-react";
+import { Loader2, ShieldCheck, XCircle, CheckCircle, ExternalLink, Trash2, Zap, Users, UserCheck, MessageCircleHeart, ArrowRight } from "lucide-react";
 
 import { motion } from "framer-motion";
 
@@ -21,6 +21,8 @@ export default function AdminDashboard() {
     const [loadingStories, setLoadingStories] = useState(true);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [loadingUsers, setLoadingUsers] = useState(true);
+    const [allMessages, setAllMessages] = useState<any[]>([]);
+    const [loadingMessages, setLoadingMessages] = useState(true);
 
 
     useEffect(() => {
@@ -30,6 +32,7 @@ export default function AdminDashboard() {
             fetchPendingVerifications();
             fetchActiveStories();
             fetchUsers();
+            fetchMessages();
         } else {
             setLoading(false);
         }
@@ -43,6 +46,7 @@ export default function AdminDashboard() {
             fetchPendingVerifications();
             fetchActiveStories();
             fetchUsers();
+            fetchMessages();
         } else {
             setAuthError(true);
             setTimeout(() => setAuthError(false), 2000);
@@ -51,15 +55,71 @@ export default function AdminDashboard() {
 
     const fetchUsers = async () => {
         setLoadingUsers(true);
-        const { data, error } = await supabase
+        const { data: publicData } = await supabase
             .from("profiles_public")
             .select("*")
             .order("created_at", { ascending: false });
 
-        if (!error && data) {
-            setAllUsers(data);
+        // Try fetching real names from profiles_private.
+        // This only works if the logged-in user has admin RLS bypass.
+        // Run 0004_admin_private_rls.sql in Supabase SQL Editor to enable this.
+        const { data: privateData, error: privError } = await supabase
+            .from("profiles_private")
+            .select("id, real_name, email");
+
+        if (privError) {
+            console.warn("Could not fetch private profiles (RLS may block this). Run the admin SQL migration.", privError);
+        }
+
+        if (publicData) {
+            const privateMap = new Map((privateData || []).map(p => [p.id, p]));
+            const merged = publicData.map(pub => ({
+                ...pub,
+                real_name: privateMap.get(pub.id)?.real_name || pub.real_name || "—",
+                email: privateMap.get(pub.id)?.email || "—"
+            }));
+            setAllUsers(merged);
         }
         setLoadingUsers(false);
+    };
+
+    const fetchMessages = async () => {
+        setLoadingMessages(true);
+        // Simple query without nested FK joins to avoid 400 errors
+        const { data: msgData, error: msgError } = await supabase
+            .from("messages")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+        if (msgError) {
+            console.error("Messages Error:", msgError);
+            setLoadingMessages(false);
+            return;
+        }
+
+        // Fetch matches to resolve sender → receiver
+        const matchIds = [...new Set((msgData || []).map(m => m.match_id).filter(Boolean))];
+        let matchMap = new Map<string, any>();
+
+        if (matchIds.length > 0) {
+            const { data: matchData } = await supabase
+                .from("matches")
+                .select("id, user_1_id, user_2_id")
+                .in("id", matchIds);
+            if (matchData) {
+                matchData.forEach(m => matchMap.set(m.id, m));
+            }
+        }
+
+        // Enrich messages with match data for rendering
+        const enriched = (msgData || []).map(msg => ({
+            ...msg,
+            _match: matchMap.get(msg.match_id) || null
+        }));
+
+        setAllMessages(enriched);
+        setLoadingMessages(false);
     };
 
     const fetchPendingVerifications = async () => {
@@ -73,20 +133,27 @@ export default function AdminDashboard() {
             .order("created_at", { ascending: false });
 
         if (error) {
-            console.error(error);
+            console.warn("⚠️ Cannot fetch pending verifications — RLS may be blocking access. Run 0004_admin_private_rls.sql in Supabase SQL Editor and set is_admin=true for your account.");
+            setPendingUsers([]);
         } else if (data) {
-            // Map storage paths to SIGNED URLs (Secure: Only admin sees them)
+            console.log("📋 Pending users raw data:", data.map(u => ({ id: u.id, student_id_url: u.student_id_url, selfie_url: u.selfie_url })));
             const usersWithUrls = await Promise.all(data.map(async (user) => {
                 let idUrl = "";
                 let selfieUrl = "";
 
-                if (user.student_id_url) {
-                    const { data: idData } = await supabase.storage.from("verifications").createSignedUrl(user.student_id_url, 3600);
-                    idUrl = idData?.signedUrl || "";
-                }
-                if (user.selfie_url) {
-                    const { data: selfieData } = await supabase.storage.from("verifications").createSignedUrl(user.selfie_url, 3600);
-                    selfieUrl = selfieData?.signedUrl || "";
+                try {
+                    if (user.student_id_url) {
+                        const { data: idData, error: idErr } = await supabase.storage.from("verifications").createSignedUrl(user.student_id_url, 3600);
+                        if (idErr) console.error("❌ ID signed URL error:", idErr.message, "| path:", user.student_id_url);
+                        idUrl = idData?.signedUrl || "";
+                    }
+                    if (user.selfie_url) {
+                        const { data: selfieData, error: selfieErr } = await supabase.storage.from("verifications").createSignedUrl(user.selfie_url, 3600);
+                        if (selfieErr) console.error("❌ Selfie signed URL error:", selfieErr.message, "| path:", user.selfie_url);
+                        selfieUrl = selfieData?.signedUrl || "";
+                    }
+                } catch (e: any) {
+                    console.error("❌ Exception generating signed URL:", e.message);
                 }
 
                 return { ...user, idUrl, selfieUrl };
@@ -96,16 +163,15 @@ export default function AdminDashboard() {
         setLoading(false);
     };
 
-    const updateStatus = async (userId: string, status: "verified" | "rejected") => {
-        setPendingUsers(prev => prev.filter(u => u.id !== userId)); // Optimistic UI update
 
-        // Update Private Profile
+    const updateStatus = async (userId: string, status: "verified" | "rejected") => {
+        setPendingUsers(prev => prev.filter(u => u.id !== userId));
+
         const { error: privErr } = await supabase
             .from("profiles_private")
             .update({ verification_status: status })
             .eq("id", userId);
 
-        // ALSO update Public Profile for UI badges AND Reveal Identity
         const { error: pubErr } = await supabase
             .from("profiles_public")
             .update({
@@ -117,7 +183,7 @@ export default function AdminDashboard() {
         if (privErr || pubErr) {
             console.error("Update Error:", privErr || pubErr);
             alert("Error updating status in one or more tables.");
-            fetchPendingVerifications(); // Revert on error
+            fetchPendingVerifications();
         }
     };
 
@@ -140,18 +206,22 @@ export default function AdminDashboard() {
 
     const fetchActiveStories = async () => {
         setLoadingStories(true);
+        // Simple query without join - avoids FK ambiguity errors
         const { data, error } = await supabase
             .from("stories")
-            .select(`
-                *,
-                profiles_public (
-                    alias
-                )
-            `)
-            .gte("expires_at", new Date().toISOString())
-            .order("created_at", { ascending: false });
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(100);
 
-        if (!error && data) {
+        if (error) {
+            console.error("Stories Error:", error);
+            // Retry without ordering if created_at fails
+            const { data: retryData } = await supabase
+                .from("stories")
+                .select("*")
+                .limit(50);
+            if (retryData) setStories(retryData);
+        } else if (data) {
             setStories(data);
         }
         setLoadingStories(false);
@@ -234,7 +304,6 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Vibe Moderator Section */}
                 <div className="mb-12">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
@@ -256,12 +325,7 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {loadingStories && stories.length === 0 ? (
-                            <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5">
-                                <Loader2 className="animate-spin text-primary w-6 h-6 mb-2" />
-                                <p className="text-[10px] text-foreground/30 font-bold uppercase tracking-widest">Scanning active vibes...</p>
-                            </div>
-                        ) : stories.length === 0 ? (
+                        {stories.length === 0 ? (
                             <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 italic text-foreground/30 text-sm">
                                 No active stories to moderate.
                             </div>
@@ -276,7 +340,9 @@ export default function AdminDashboard() {
                                     <div className="flex items-center justify-between">
                                         <div className="flex flex-col">
                                             <span className="text-[9px] font-black uppercase tracking-[0.2em] text-primary mb-1">{story.vibe_category}</span>
-                                            <span className="text-xs font-bold text-white/50">{story.profiles_public?.alias || "Anonymous Student"}</span>
+                                            <span className="text-xs font-bold text-white/50">
+                                                {allUsers.find(u => u.id === story.user_id)?.alias || story.alias || "Anonymous Student"}
+                                            </span>
                                         </div>
                                         <button
                                             onClick={() => deleteStory(story.id)}
@@ -292,7 +358,6 @@ export default function AdminDashboard() {
                                     <div className="pt-3 border-t border-white/5 mt-auto">
                                         <div className="flex items-center justify-between text-[8px] font-black uppercase tracking-widest text-foreground/20">
                                             <span>Posted {new Date(story.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                            <span>Expires {new Date(story.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                         </div>
                                     </div>
                                 </motion.div>
@@ -302,7 +367,6 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-                    {/* Real-time Stats */}
                     <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Total Students</p>
@@ -336,7 +400,6 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Users List Section */}
                 <div className="mb-12">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
@@ -362,21 +425,14 @@ export default function AdminDashboard() {
                             <table className="w-full text-left">
                                 <thead className="bg-white/5 border-b border-white/5">
                                     <tr>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Student Alias</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Student (Real Name)</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Status</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Type</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Vibe Score</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/5">
-                                    {loadingUsers && allUsers.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={4} className="px-6 py-12 text-center">
-                                                <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
-                                                <p className="text-xs text-foreground/30 font-bold uppercase tracking-widest">Fetching student data...</p>
-                                            </td>
-                                        </tr>
-                                    ) : allUsers.length === 0 ? (
+                                    {allUsers.length === 0 ? (
                                         <tr>
                                             <td colSpan={4} className="px-6 py-12 text-center italic text-foreground/30 text-sm">
                                                 No students found on campus.
@@ -390,7 +446,10 @@ export default function AdminDashboard() {
                                                         <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary text-xs border border-primary/20">
                                                             {user.alias?.[0]}
                                                         </div>
-                                                        <span className="font-bold text-white text-sm">{user.alias}</span>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-white text-sm">{user.alias}</span>
+                                                            <span className="text-[10px] text-foreground/30 font-medium italic">{user.real_name}</span>
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4">
@@ -416,10 +475,10 @@ export default function AdminDashboard() {
                                                     <div className="flex items-center gap-1.5">
                                                         {Object.values(user.vibe_scores || {}).map((score: any, idx) => (
                                                             <div key={idx} className="w-1.5 h-1.5 rounded-full bg-primary/30"
-                                                                style={{ opacity: score / 5 }} />
+                                                                style={{ opacity: (Number(score) || 0) / 5 }} />
                                                         ))}
                                                         <span className="text-[10px] text-foreground/40 font-mono ml-1">
-                                                            {Number(Object.values(user.vibe_scores || {}).reduce((a: any, b: any) => a + b, 0))}
+                                                            {Object.values(user.vibe_scores || {}).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0)}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -432,8 +491,58 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
+                <div className="mb-12">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+                                <MessageCircleHeart className="w-5 h-5 text-primary" />
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white">Campus Chatter (God Mode)</h2>
+                                <p className="text-foreground/40 text-xs">Real-time monitor of student interactions (Last 50 messages)</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={fetchMessages}
+                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
+                        >
+                            <Loader2 className={`w-3 h-3 ${loadingMessages ? 'animate-spin' : ''}`} />
+                            Live Sync
+                        </button>
+                    </div>
+
+                    <div className="glass-panel rounded-[2rem] border border-white/5 overflow-hidden">
+                        <div className="max-h-[400px] overflow-y-auto">
+                            {allMessages.length === 0 ? (
+                                <div className="p-12 text-center text-foreground/30 italic text-sm">
+                                    Campus is currently quiet.
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-white/5">
+                                    {allMessages.map((msg) => {
+                                        const senderAlias = allUsers.find(u => u.id === msg.sender_id)?.alias || "Unknown";
+                                        const match = msg._match;
+                                        const receiverId = match ? (match.user_1_id === msg.sender_id ? match.user_2_id : match.user_1_id) : null;
+                                        const receiverAlias = receiverId ? (allUsers.find(u => u.id === receiverId)?.alias || "Stranger") : "Stranger";
+                                        return (
+                                            <div key={msg.id} className="px-6 py-4 flex flex-col gap-1 hover:bg-white/[0.02]">
+                                                <div className="flex items-center gap-2 text-[10px] font-bold">
+                                                    <span className="text-primary uppercase tracking-widest">{senderAlias}</span>
+                                                    <ArrowRight className="w-3 h-3 text-foreground/20" />
+                                                    <span className="text-white uppercase tracking-widest">{receiverAlias}</span>
+                                                    <span className="ml-auto text-foreground/20 font-mono">{new Date(msg.created_at).toLocaleTimeString()}</span>
+                                                </div>
+                                                <p className="text-sm text-foreground/70 leading-relaxed">{msg.content}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
-                    {/* Stats Card */}
                     <div className="glass-panel p-8 rounded-3xl border border-white/5 flex items-center gap-6">
                         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
                             <CheckCircle className="w-8 h-8 text-primary" />
@@ -444,7 +553,6 @@ export default function AdminDashboard() {
                         </div>
                     </div>
 
-                    {/* Broadcast Tool */}
                     <div className="glass-panel p-8 rounded-3xl border border-primary/20 bg-primary/5 shadow-[0_0_30px_rgba(109,93,254,0.1)]">
                         <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
                             <ShieldCheck className="w-5 h-5 text-primary" />
