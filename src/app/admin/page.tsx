@@ -60,13 +60,14 @@ export default function AdminDashboard() {
             .select("*")
             .order("created_at", { ascending: false });
 
-        // Instead of querying profiles_private directly (which RLS blocks),
-        // we call the highly secure RPC function built specifically for the Admin God Mode.
+        // Fetch directly from profiles_private (this is where the original real names are)
         const { data: privateData, error: privError } = await supabase
-            .rpc("get_admin_private_profiles");
+            .from("profiles_private")
+            .select("id, real_name, email, verification_status")
+            .order("created_at", { ascending: false });
 
         if (privError) {
-            console.warn("Could not fetch private profiles. Run the SQL fix to create the RPC function.", privError);
+            console.warn("Could not fetch private profiles.", privError);
         }
 
         const allIds = new Set<string>();
