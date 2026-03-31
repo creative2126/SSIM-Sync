@@ -222,6 +222,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 .eq("id", matchData.id);
 
             setMatchData((prev: any) => ({ ...prev, streak_count: newStreak, last_message_at: now.toISOString() }));
+
+            // ⚡ Trigger real-time push notification for the OTHER user
+            fetch("/api/test-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: id, // The OTHER user's ID from params
+                    title: `SSIM Sync: New message from ${myProfile?.alias || "Someone"}`,
+                    body: msg.length > 50 ? msg.substring(0, 47) + "..." : msg
+                })
+            }).catch(e => console.warn("Background notification failed:", e));
         }
     };
 

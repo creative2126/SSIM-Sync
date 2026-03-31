@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 // Initialize Supabase Admin client to fetch the user's secure push subscription
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // For production, should use SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 // We define our securely generated VAPID keys here
