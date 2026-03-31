@@ -60,16 +60,13 @@ export default function AdminDashboard() {
             .select("*")
             .order("created_at", { ascending: false });
 
-        // Try fetching real names from profiles_private.
-        // This only works if the logged-in user has admin RLS bypass.
-        // Run 0004_admin_private_rls.sql in Supabase SQL Editor to enable this.
+        // Instead of querying profiles_private directly (which RLS blocks),
+        // we call the highly secure RPC function built specifically for the Admin God Mode.
         const { data: privateData, error: privError } = await supabase
-            .from("profiles_private")
-            .select("id, real_name, email, verification_status")
-            .order("created_at", { ascending: false });
+            .rpc("get_admin_private_profiles");
 
         if (privError) {
-            console.warn("Could not fetch private profiles (RLS may block this). Run the admin SQL migration.", privError);
+            console.warn("Could not fetch private profiles. Run the SQL fix to create the RPC function.", privError);
         }
 
         const allIds = new Set<string>();
