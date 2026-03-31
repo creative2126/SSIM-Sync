@@ -53,13 +53,13 @@ export default function PushInitializer() {
             // Upsert subscription payload into Supabase
             const { error: upsertErr } = await supabase.from("push_subscriptions").upsert({
                 user_id: session.user.id,
-                subscription: JSON.parse(JSON.stringify(subscription)) // Converts PushSubscription object to pure JSON
-            });
+                subscription: JSON.parse(JSON.stringify(subscription))
+            }, { onConflict: "user_id" });
 
             if (upsertErr) {
-                console.error("Failed to save push subscription to DB:", upsertErr);
+                console.error("Failed to save push subscription to DB - code:", upsertErr.code, "| message:", upsertErr.message, "| hint:", upsertErr.hint);
             } else {
-                console.log("Push notifications active and saved to DB");
+                console.log("✅ Push notifications active and saved to DB");
             }
         } catch (error) {
             console.error("Service Worker registration/subscription failed:", error);

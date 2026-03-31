@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
+// Required: web-push uses Node.js crypto APIs, not available on Edge runtime
+export const runtime = 'nodejs';
+
 // Initialize Supabase Admin client to fetch the user's secure push subscription
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
