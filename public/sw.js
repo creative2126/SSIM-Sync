@@ -3,9 +3,10 @@ self.addEventListener('push', function(event) {
         const data = event.data.json();
         const options = {
             body: data.body,
-            icon: '/icons/icon-192x192.png', // Fallback icon path
-            badge: '/icons/badge-72x72.png',
+            icon: '/icon.png', 
+            badge: '/icon.png',
             vibrate: [100, 50, 100],
+            tag: 'ssim-sync-alert', // Bundles notifications to avoid 'spammy' behavior
             data: {
                 url: data.url || '/'
             }
