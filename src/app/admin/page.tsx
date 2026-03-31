@@ -260,13 +260,24 @@ export default function AdminDashboard() {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) { alert("Not logged in"); return; }
+
+            // Get the browser's active push subscription directly
+            const swReg = await navigator.serviceWorker.ready;
+            const browserSub = await swReg.pushManager.getSubscription();
+
+            if (!browserSub) {
+                alert("No push subscription found in browser. Please allow notifications first and reload the page.");
+                return;
+            }
+
             const res = await fetch("/api/test-push", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     userId: session.user.id,
                     title: "🔔 Admin Test Ping",
-                    body: "SSIM Sync Push Notifications are live!"
+                    body: "SSIM Sync Push Notifications are live!",
+                    subscription: JSON.parse(JSON.stringify(browserSub))
                 })
             });
             const dat = await res.json();

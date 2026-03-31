@@ -23,33 +23,36 @@ webPush.setVapidDetails(
 
 export async function POST(request: Request) {
   try {
-    const { userId, title, body } = await request.json();
+    const { userId, title, body, subscription } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "Missing userId parameter" }, { status: 400 });
     }
 
-    // 1. Fetch the user's Push Subscription from Supabase
-    const { data: subscriptionRecord, error } = await supabaseAdmin
-      .from("push_subscriptions")
-      .select("subscription")
-      .eq("user_id", userId)
-      .single();
+    let pushSubscription = subscription;
 
-    if (error || !subscriptionRecord) {
-      return NextResponse.json({ error: "User has no push subscription" }, { status: 404 });
+    // If no subscription passed directly, try to fetch from DB
+    if (!pushSubscription) {
+      const { data: subscriptionRecord, error } = await supabaseAdmin
+        .from("push_subscriptions")
+        .select("subscription")
+        .eq("user_id", userId)
+        .single();
+
+      if (error || !subscriptionRecord) {
+        return NextResponse.json({ error: "User has no push subscription. Please allow notifications first." }, { status: 404 });
+      }
+      pushSubscription = subscriptionRecord.subscription;
     }
 
-    const pushSubscription = subscriptionRecord.subscription;
-
-    // 2. Prepare the notification payload
+    // Prepare the notification payload
     const payload = JSON.stringify({
       title: title || 'New Vibe Match! ✨',
       body: body || 'Someone just swiped right on your profile...',
       url: '/matches'
     });
 
-    // 3. Dispatch the ping to Google/Mozilla servers
+    // Dispatch the ping to Google/Mozilla servers
     await webPush.sendNotification(pushSubscription as webPush.PushSubscription, payload);
 
     return NextResponse.json({ success: true, message: "Push notification dispatched successfully!" });
