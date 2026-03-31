@@ -82,12 +82,19 @@ export default function FeedPage() {
             const targetGender = myProfile.gender === "Male" ? "Female" : "Male";
 
             // 3. Get existing matches, blocks, AND passes to exclude
-            const [{ data: existingMatches }, { data: myBlocks }, { data: blockedMe }, { data: myPasses }] = await Promise.all([
+            const [
+                { data: existingMatches, error: matchesErr },
+                { data: myBlocks, error: blocksErr },
+                { data: blockedMe, error: blockedMeErr },
+                { data: myPasses, error: passesErr }
+            ] = await Promise.all([
                 supabase.from("matches").select("user_1_id, user_2_id").or(`user_1_id.eq.${session.user.id},user_2_id.eq.${session.user.id}`),
                 supabase.from("blocks").select("blocked_id").eq("blocker_id", session.user.id),
                 supabase.from("blocks").select("blocker_id").eq("blocked_id", session.user.id),
                 supabase.from("feed_passes").select("target_id").eq("user_id", session.user.id)
             ]);
+
+            if (passesErr) console.error("Error fetching feed_passes:", passesErr);
 
             const excludedIds = new Set<string>();
             excludedIds.add(session.user.id);
@@ -170,10 +177,14 @@ export default function FeedPage() {
             }
         } else if (action === "pass") {
             // Persistent rejection
-            await supabase.from("feed_passes").insert({
+            const { error: passErr } = await supabase.from("feed_passes").insert({
                 user_id: currentUser.id,
                 target_id: targetProfile.id
             });
+
+            if (passErr) {
+                console.error("Error inserting pass (check if feed_passes table exists):", passErr);
+            }
         }
 
         setCurrentIndex(prev => prev + 1);

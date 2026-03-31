@@ -65,18 +65,34 @@ export default function AdminDashboard() {
         // Run 0004_admin_private_rls.sql in Supabase SQL Editor to enable this.
         const { data: privateData, error: privError } = await supabase
             .from("profiles_private")
-            .select("id, real_name, email");
+            .select("id, real_name, email, verification_status")
+            .order("created_at", { ascending: false });
 
         if (privError) {
             console.warn("Could not fetch private profiles (RLS may block this). Run the admin SQL migration.", privError);
         }
 
-        if (publicData) {
-            const privateMap = new Map((privateData || []).map(p => [p.id, p]));
+        if (privateData) {
+            const publicMap = new Map((publicData || []).map(p => [p.id, p]));
+            const merged = privateData.map(priv => {
+                const pub = publicMap.get(priv.id) || {};
+                return {
+                    id: priv.id,
+                    real_name: priv.real_name || "—",
+                    email: priv.email || "—",
+                    verification_status: priv.verification_status,
+                    alias: pub.alias || "Incomplete Setup",
+                    is_demo: pub.is_demo || false,
+                    vibe_scores: pub.vibe_scores || {}
+                };
+            });
+            setAllUsers(merged);
+        } else if (publicData) {
+            // Fallback if private DB fails (due to RLS or missing God Mode setup)
             const merged = publicData.map(pub => ({
                 ...pub,
-                real_name: privateMap.get(pub.id)?.real_name || pub.real_name || "—",
-                email: privateMap.get(pub.id)?.email || "—"
+                real_name: "—",
+                email: "—"
             }));
             setAllUsers(merged);
         }
@@ -478,7 +494,7 @@ export default function AdminDashboard() {
                                                                 style={{ opacity: (Number(score) || 0) / 5 }} />
                                                         ))}
                                                         <span className="text-[10px] text-foreground/40 font-mono ml-1">
-                                                            {Object.values(user.vibe_scores || {}).reduce<number>((a, b) => a + (Number(b) || 0), 0)}
+                                                            {Object.values(user.vibe_scores || {}).reduce((a: number, b: any) => a + (Number(b) || 0), 0)}
                                                         </span>
                                                     </div>
                                                 </td>
