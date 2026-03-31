@@ -81,8 +81,8 @@ export default function AdminDashboard() {
             const priv = privateMap.get(id) || {};
             return {
                 id,
-                real_name: priv.real_name || "—",
-                email: priv.email || "—",
+                real_name: priv.real_name || pub.real_name || "—",
+                email: priv.email || pub.email || "—",
                 verification_status: priv.verification_status || pub.verification_status || "pending",
                 alias: pub.alias || "Incomplete Setup",
                 is_demo: pub.is_demo || false,
