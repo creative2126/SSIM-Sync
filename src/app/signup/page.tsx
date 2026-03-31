@@ -41,6 +41,7 @@ export default function SignupPage() {
                 email: emailStr,
                 password: formData.password,
                 options: {
+                    emailRedirectTo: `${window.location.origin}/onboarding`,
                     data: {
                         full_name: formData.fullName,
                         gender: formData.gender

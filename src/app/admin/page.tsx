@@ -254,6 +254,28 @@ export default function AdminDashboard() {
         }
     };
 
+    const pingMyPhone = async () => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            alert("Sending ping request to your browser...");
+            const res = await fetch("/api/test-push", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userId: session.user.id,
+                    title: "🔔 Admin Test Ping",
+                    body: "SSIM Sync Push Infrastructure is officially live!"
+                })
+            });
+            const dat = await res.json();
+            if (dat.error) alert("Error: " + dat.error);
+            else console.log("Ping success:", dat);
+        } catch (e: any) {
+            alert("Fetch failed: " + e.message);
+        }
+    };
+
     if (loading) return <div className="min-h-screen bg-midnight flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
 
     if (!isAuthorized) {
