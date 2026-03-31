@@ -72,30 +72,28 @@ export default function AdminDashboard() {
             console.warn("Could not fetch private profiles (RLS may block this). Run the admin SQL migration.", privError);
         }
 
-        if (privateData) {
-            const publicMap = new Map((publicData || []).map(p => [p.id, p]));
-            const merged = privateData.map(priv => {
-                const pub = publicMap.get(priv.id) || {};
-                return {
-                    id: priv.id,
-                    real_name: priv.real_name || "—",
-                    email: priv.email || "—",
-                    verification_status: priv.verification_status,
-                    alias: pub.alias || "Incomplete Setup",
-                    is_demo: pub.is_demo || false,
-                    vibe_scores: pub.vibe_scores || {}
-                };
-            });
-            setAllUsers(merged);
-        } else if (publicData) {
-            // Fallback if private DB fails (due to RLS or missing God Mode setup)
-            const merged = publicData.map(pub => ({
-                ...pub,
-                real_name: "—",
-                email: "—"
-            }));
-            setAllUsers(merged);
-        }
+        const allIds = new Set<string>();
+        (publicData || []).forEach(p => allIds.add(p.id));
+        (privateData || []).forEach(p => allIds.add(p.id));
+
+        const publicMap = new Map<string, any>((publicData || []).map(p => [p.id, p]));
+        const privateMap = new Map<string, any>((privateData || []).map(p => [p.id, p]));
+
+        const merged = Array.from(allIds).map(id => {
+            const pub = publicMap.get(id) || {};
+            const priv = privateMap.get(id) || {};
+            return {
+                id,
+                real_name: priv.real_name || "—",
+                email: priv.email || "—",
+                verification_status: priv.verification_status || pub.verification_status || "pending",
+                alias: pub.alias || "Incomplete Setup",
+                is_demo: pub.is_demo || false,
+                vibe_scores: pub.vibe_scores || {}
+            };
+        });
+
+        setAllUsers(merged);
         setLoadingUsers(false);
     };
 
