@@ -94,7 +94,8 @@ export default function VibesPage() {
                     content,
                     created_at,
                     user_id,
-                    profiles_public (id, alias, gender, verification_status)
+                    profiles_public (id, alias, gender, verification_status),
+                    vibe_comments(count)
                 `)
                 .order("created_at", { ascending: false });
 
@@ -210,6 +211,13 @@ export default function VibesPage() {
         if (!error) {
             setNewComment("");
             fetchComments(vibeId); // Refresh comments
+            
+            // Increment local count
+            setVibes(prev => prev.map(v => 
+                v.id === vibeId 
+                    ? { ...v, vibe_comments: [{ count: (v.vibe_comments?.[0]?.count || 0) + 1 }] } 
+                    : v
+            ));
         } else {
             alert("Failed to post comment.");
         }
@@ -346,7 +354,7 @@ export default function VibesPage() {
                                     className={`flex-1 py-3.5 rounded-2xl font-bold text-xs border transition-all active:scale-95 flex items-center justify-center gap-2 ${expandedVibeId === vibe.id ? 'bg-primary/20 border-primary text-primary' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`}
                                 >
                                     <MessageSquare className="w-3.5 h-3.5" />
-                                    Comments
+                                    {vibe.vibe_comments?.[0]?.count || 0}
                                 </button>
                                 <button
                                     onClick={() => connectWithUser(vibe.user_id)}
