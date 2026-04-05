@@ -19,6 +19,12 @@ export default function VibesPage() {
     const [selectedProfile, setSelectedProfile] = useState<any>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
 
+    // Comment states
+    const [expandedVibeId, setExpandedVibeId] = useState<string | null>(null);
+    const [comments, setComments] = useState<{ [key: string]: any[] }>({});
+    const [newComment, setNewComment] = useState("");
+    const [isCommenting, setIsCommenting] = useState(false);
+
     useEffect(() => {
         initVibes();
     }, []);
@@ -140,6 +146,62 @@ export default function VibesPage() {
         setLoading(false);
     };
 
+    const fetchComments = async (vibeId: string) => {
+        const { data, error } = await supabase
+            .from("vibe_comments")
+            .select(`
+                id,
+                content,
+                created_at,
+                user_id,
+                profiles_public (alias, gender)
+            `)
+            .eq("vibe_id", vibeId)
+            .order("created_at", { ascending: true });
+
+        if (!error) {
+            setComments(prev => ({ ...prev, [vibeId]: data || [] }));
+        }
+    };
+
+    const toggleComments = (vibeId: string) => {
+        if (expandedVibeId === vibeId) {
+            setExpandedVibeId(null);
+        } else {
+            setExpandedVibeId(vibeId);
+            if (!comments[vibeId]) {
+                fetchComments(vibeId);
+            }
+        }
+    };
+
+    const handlePostComment = async (vibeId: string) => {
+        if (!newComment.trim() || !session) return;
+
+        // AUTOMATED SAFETY FILTER (Phase 15 - Applied to Comments)
+        const safetyResult = checkContentSafety(newComment);
+        if (safetyResult.isHarmful) {
+            alert(`Comment Blocked: Inappropriate language detected.`);
+            setNewComment("");
+            return;
+        }
+
+        setIsCommenting(true);
+        const { error } = await supabase.from("vibe_comments").insert({
+            vibe_id: vibeId,
+            user_id: session.user.id,
+            content: newComment
+        });
+
+        if (!error) {
+            setNewComment("");
+            fetchComments(vibeId); // Refresh comments
+        } else {
+            alert("Failed to post comment.");
+        }
+        setIsCommenting(false);
+    };
+
     const connectWithUser = async (targetUserId: string) => {
         if (!session) return router.push("/login");
         if (session.user.id === targetUserId) return alert("You can't vibe with yourself!");
@@ -258,12 +320,19 @@ export default function VibesPage() {
                                 "{vibe.content}"
                             </p>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => viewProfile(vibe.user_id)}
                                     className="flex-1 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/5 transition-all active:scale-95"
                                 >
-                                    View Profile
+                                    Profile
+                                </button>
+                                <button
+                                    onClick={() => toggleComments(vibe.id)}
+                                    className={`flex-1 py-3.5 rounded-2xl font-bold text-xs border transition-all active:scale-95 flex items-center justify-center gap-2 ${expandedVibeId === vibe.id ? 'bg-primary/20 border-primary text-primary' : 'bg-white/5 border-white/5 text-white hover:bg-white/10'}`}
+                                >
+                                    <MessageSquare className="w-3.5 h-3.5" />
+                                    Comments
                                 </button>
                                 <button
                                     onClick={() => connectWithUser(vibe.user_id)}
@@ -272,6 +341,52 @@ export default function VibesPage() {
                                     Connect
                                 </button>
                             </div>
+
+                            {/* Comments Section */}
+                            <AnimatePresence>
+                                {expandedVibeId === vibe.id && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="mt-6 pt-6 border-t border-white/5"
+                                    >
+                                        <div className="space-y-4 max-h-[300px] overflow-y-auto mb-6 pr-2 scrollbar-hide">
+                                            {comments[vibe.id]?.length === 0 ? (
+                                                <p className="text-center text-foreground/20 text-[10px] font-bold uppercase tracking-widest py-4">No comments yet. Be the first!</p>
+                                            ) : (
+                                                comments[vibe.id]?.map((comment) => (
+                                                    <div key={comment.id} className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{comment.profiles_public?.alias}</span>
+                                                            <span className="text-[8px] text-foreground/20 font-medium">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        </div>
+                                                        <p className="text-xs text-foreground/70 leading-relaxed">{comment.content}</p>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                value={newComment}
+                                                onChange={(e) => setNewComment(e.target.value)}
+                                                placeholder="Write a comment..."
+                                                className="w-full bg-midnight/50 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-foreground/20 focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
+                                                onKeyDown={(e) => e.key === 'Enter' && handlePostComment(vibe.id)}
+                                            />
+                                            <button
+                                                onClick={() => handlePostComment(vibe.id)}
+                                                disabled={isCommenting || !newComment.trim()}
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:scale-110 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all"
+                                            >
+                                                {isCommenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                         </motion.div>
                     ))}
                 </div>
