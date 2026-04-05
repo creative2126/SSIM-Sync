@@ -4,8 +4,22 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap, Send, UserCircle2, MessageSquare, X, Heart, Shield, ShieldCheck, AlertCircle } from "lucide-react";
+import { Loader2, Zap, Send, UserCircle2, MessageSquare, X, Heart, Shield, ShieldCheck, AlertCircle, MessageCircle } from "lucide-react";
 import { checkContentSafety } from "@/lib/utils/safety";
+
+const getAvatarColor = (alias: string) => {
+    const colors = [
+        'bg-pink-500', 'bg-purple-500', 'bg-indigo-500',
+        'bg-blue-500', 'bg-cyan-500', 'bg-teal-500',
+        'bg-emerald-500', 'bg-amber-500', 'bg-orange-500',
+        'bg-rose-500', 'bg-violet-500'
+    ];
+    let hash = 0;
+    for (let i = 0; i < (alias?.length || 0); i++) {
+        hash = alias.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+};
 
 export default function VibesPage() {
     const router = useRouter();
@@ -351,35 +365,64 @@ export default function VibesPage() {
                                         exit={{ opacity: 0, height: 0 }}
                                         className="mt-6 pt-6 border-t border-white/5"
                                     >
-                                        <div className="space-y-4 max-h-[300px] overflow-y-auto mb-6 pr-2 scrollbar-hide">
+                                        <div className="flex items-center gap-2 mb-4">
+                                            <MessageCircle className="w-4 h-4 text-primary" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40">Discussion</h4>
+                                        </div>
+
+                                        <div className="space-y-3 max-h-[350px] overflow-y-auto mb-6 pr-2 scrollbar-hide py-1">
                                             {comments[vibe.id]?.length === 0 ? (
-                                                <p className="text-center text-foreground/20 text-[10px] font-bold uppercase tracking-widest py-4">No comments yet. Be the first!</p>
+                                                <div className="flex flex-col items-center justify-center py-8 opacity-20">
+                                                    <MessageSquare className="w-8 h-8 mb-2" />
+                                                    <p className="text-[10px] font-bold uppercase tracking-widest">Silence is golden...</p>
+                                                </div>
                                             ) : (
-                                                comments[vibe.id]?.map((comment) => (
-                                                    <div key={comment.id} className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                                                        <div className="flex justify-between items-start mb-1">
-                                                            <span className="text-[10px] font-bold text-primary uppercase tracking-wider">{comment.profiles_public?.alias}</span>
-                                                            <span className="text-[8px] text-foreground/20 font-medium">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                comments[vibe.id]?.map((comment, cidx) => (
+                                                    <motion.div
+                                                        key={comment.id}
+                                                        initial={{ opacity: 0, x: -10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: cidx * 0.05 }}
+                                                        className="group/comment relative"
+                                                    >
+                                                        <div className="flex gap-3">
+                                                            <div className={`w-8 h-8 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white shadow-lg ${getAvatarColor(comment.profiles_public?.alias)}`}>
+                                                                {comment.profiles_public?.alias?.[0]?.toUpperCase()}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="bg-white/[0.03] group-hover/comment:bg-white/[0.05] p-3 rounded-2xl rounded-tl-none border border-white/5 transition-colors">
+                                                                    <div className="flex justify-between items-center mb-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="text-[11px] font-bold text-white/90">{comment.profiles_public?.alias}</span>
+                                                                            {comment.user_id === vibe.user_id && (
+                                                                                <span className="px-1.5 py-0.5 rounded-md bg-primary/20 text-primary text-[8px] font-black uppercase tracking-tighter">Author</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <span className="text-[8px] text-foreground/20 font-medium">{new Date(comment.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                                    </div>
+                                                                    <p className="text-xs text-foreground/70 leading-relaxed break-words">{comment.content}</p>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <p className="text-xs text-foreground/70 leading-relaxed">{comment.content}</p>
-                                                    </div>
+                                                    </motion.div>
                                                 ))
                                             )}
                                         </div>
 
-                                        <div className="relative">
+                                        <div className="relative group/input">
+                                            <div className="absolute inset-0 bg-primary/5 rounded-2xl blur-xl opacity-0 group-focus-within/input:opacity-100 transition-opacity" />
                                             <input
                                                 type="text"
                                                 value={newComment}
                                                 onChange={(e) => setNewComment(e.target.value)}
-                                                placeholder="Write a comment..."
-                                                className="w-full bg-midnight/50 border border-white/10 rounded-xl px-4 py-3 text-xs text-white placeholder:text-foreground/20 focus:ring-1 focus:ring-primary focus:border-primary transition-all outline-none pr-12"
+                                                placeholder="Say something nice..."
+                                                className="relative w-full bg-midnight/80 border border-white/10 rounded-2xl px-5 py-4 text-sm text-white placeholder:text-foreground/20 focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all outline-none pr-14 shadow-2xl shadow-black/20"
                                                 onKeyDown={(e) => e.key === 'Enter' && handlePostComment(vibe.id)}
                                             />
                                             <button
                                                 onClick={() => handlePostComment(vibe.id)}
                                                 disabled={isCommenting || !newComment.trim()}
-                                                className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-primary hover:scale-110 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all"
+                                                className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white hover:scale-105 active:scale-95 disabled:opacity-30 disabled:grayscale transition-all shadow-lg shadow-primary/20"
                                             >
                                                 {isCommenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                             </button>
