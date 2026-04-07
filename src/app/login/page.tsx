@@ -34,7 +34,7 @@ export default function LoginPage() {
                 .single();
 
             if (profile?.alias && !profile.alias.startsWith("User_")) {
-                router.push("/feed");
+                router.push("/vibes");
             } else {
                 router.push("/onboarding");
             }

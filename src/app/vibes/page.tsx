@@ -27,7 +27,9 @@ export default function VibesPage() {
     const [vibes, setVibes] = useState<any[]>([]);
     const [newVibe, setNewVibe] = useState("");
     const [session, setSession] = useState<any>(null);
+    const [myProfile, setMyProfile] = useState<any>(null);
     const [isSharing, setIsSharing] = useState(false);
+    const [showVerificationModal, setShowVerificationModal] = useState(false);
     const [safetyError, setSafetyError] = useState<string | null>(null);
 
     const [selectedProfile, setSelectedProfile] = useState<any>(null);
@@ -47,6 +49,11 @@ export default function VibesPage() {
     const initVibes = async () => {
         const { data: { session: currentSession } } = await supabase.auth.getSession();
         setSession(currentSession);
+        
+        if (currentSession) {
+            const { data: profile } = await supabase.from("profiles_public").select("*").eq("id", currentSession.user.id).single();
+            setMyProfile(profile);
+        }
 
         await fetchVibes();
 
@@ -160,6 +167,11 @@ export default function VibesPage() {
 
     const handleShareVibe = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (myProfile?.verification_status !== 'verified') {
+            setShowVerificationModal(true);
+            return;
+        }
+
         setSafetyError(null);
         if (!newVibe.trim() || !session) return;
 
@@ -231,6 +243,10 @@ export default function VibesPage() {
 
     const toggleLike = async (vibeId: string) => {
         if (!session) return router.push("/login");
+        if (myProfile?.verification_status !== 'verified') {
+            setShowVerificationModal(true);
+            return;
+        }
 
         const isLiked = userLikes.has(vibeId);
         
@@ -254,6 +270,10 @@ export default function VibesPage() {
     };
 
     const handlePostComment = async (vibeId: string) => {
+        if (myProfile?.verification_status !== 'verified') {
+            setShowVerificationModal(true);
+            return;
+        }
         if (!newComment.trim() || !session) return;
 
         // AUTOMATED SAFETY FILTER (Phase 15 - Applied to Comments)
@@ -289,6 +309,10 @@ export default function VibesPage() {
 
     const connectWithUser = async (targetUserId: string) => {
         if (!session) return router.push("/login");
+        if (myProfile?.verification_status !== 'verified') {
+            setShowVerificationModal(true);
+            return;
+        }
         if (session.user.id === targetUserId) return alert("You can't vibe with yourself!");
 
         // Check for existing match
@@ -317,7 +341,20 @@ export default function VibesPage() {
 
     return (
         <main className="min-h-screen bg-midnight">
-            <div className="mobile-container">
+            {/* Verification Hook Banner */}
+            {myProfile && myProfile.verification_status !== 'verified' && (
+                <div className="bg-primary/20 border-b border-primary/20 py-3 px-6 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-primary flex items-center justify-between shadow-lg shadow-black/20 relative z-[60]">
+                    <span className="flex items-center gap-2">
+                        <Shield className="w-3 h-3" />
+                        Complete Onboarding for Full Campus Access
+                    </span>
+                    <button onClick={() => router.push("/onboarding")} className="bg-primary text-white px-3 py-1.5 rounded-lg hover:scale-105 active:scale-95 transition-all">
+                        Verify Now
+                    </button>
+                </div>
+            )}
+
+            <div className="mobile-container pt-8">
 
                 {/* Header */}
                 <header className="mb-8">
@@ -592,6 +629,33 @@ export default function VibesPage() {
                                 <MessageSquare className="w-5 h-5" />
                                 Initiate Vibe
                             </button>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
+            {/* Verification Prompt Modal */}
+            <AnimatePresence>
+                {showVerificationModal && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-midnight/90 backdrop-blur-xl" onClick={() => setShowVerificationModal(false)} />
+                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative w-full max-w-sm glass-panel p-8 rounded-[2.5rem] border border-primary/20 text-center shadow-[0_0_50px_rgba(109,93,254,0.3)]">
+                            <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-6 border border-primary/30">
+                                <ShieldCheck className="w-10 h-10 text-primary" />
+                            </div>
+                            <h2 className="text-2xl font-bold text-white mb-4">Complete Verification</h2>
+                            <p className="text-foreground/60 text-sm leading-relaxed mb-8">
+                                To post, comment, or connect with other students, you must verify your identity using your **Student ID**.
+                                <br /><br />
+                                <strong className="text-white italic">It only takes 2 minutes!</strong>
+                            </p>
+                            <div className="flex flex-col gap-3">
+                                <button onClick={() => router.push("/onboarding")} className="w-full py-4 bg-primary text-white rounded-2xl font-bold shadow-xl shadow-primary/20 hover:scale-105 transition-all">
+                                    Finish Onboarding
+                                </button>
+                                <button onClick={() => setShowVerificationModal(false)} className="w-full py-4 bg-white/5 text-foreground/40 rounded-2xl font-bold">
+                                    Maybe Later
+                                </button>
+                            </div>
                         </motion.div>
                     </div>
                 )}

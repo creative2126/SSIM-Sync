@@ -181,21 +181,36 @@ export default function OnboardingPage() {
         <main className="min-h-screen flex flex-col items-center py-12 px-6 relative overflow-hidden bg-midnight">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo/10 via-midnight to-midnight pointer-events-none" />
 
-            {/* Progress Bar */}
-            <div className="w-full max-w-2xl flex items-center justify-between mb-12 relative z-10">
-                {[1, 2, 3].map(num => (
-                    <div key={num} className="flex flex-col items-center gap-2 flex-1 relative">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${step >= num ? "bg-primary text-white shadow-[0_0_15px_rgba(109,93,254,0.4)]" : "bg-indigo/30 text-foreground/40 border border-white/5"}`}>
-                            {step > num ? <CheckCircle2 className="w-5 h-5" /> : num}
-                        </div>
-                        <span className={`text-xs ${step >= num ? "text-primary" : "text-foreground/40"}`}>
-                            {num === 1 ? "The Vibe" : num === 2 ? "The Profile" : "Verification"}
-                        </span>
-                        {num !== 3 && (
-                            <div className={`absolute top-5 left-1/2 w-full h-[2px] -z-10 ${step > num ? "bg-primary/50" : "bg-white/5"}`} />
-                        )}
+            {/* Progress Bar & Skip Button */}
+            <div className="w-full max-w-2xl px-2 mb-12 relative z-10">
+                <div className="flex items-center justify-between mb-8">
+                    <div className="flex flex-col">
+                        <h1 className="text-xl font-bold text-white leading-none mb-1">Onboarding</h1>
+                        <p className="text-[10px] text-foreground/40 uppercase tracking-widest font-black">Customize your persona</p>
                     </div>
-                ))}
+                    <button 
+                        onClick={() => router.push("/vibes")} 
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white/40 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-white/5"
+                    >
+                        Skip for now
+                    </button>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                    {[1, 2, 3].map(num => (
+                        <div key={num} className="flex flex-col items-center gap-2 flex-1 relative">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${step >= num ? "bg-primary text-white shadow-[0_0_15px_rgba(109,93,254,0.4)]" : "bg-indigo/30 text-foreground/40 border border-white/5"}`}>
+                                {step > num ? <CheckCircle2 className="w-5 h-5" /> : num}
+                            </div>
+                            <span className={`text-[10px] font-black uppercase tracking-tighter mt-1 ${step >= num ? "text-primary" : "text-foreground/40"}`}>
+                                {num === 1 ? "Vibe" : num === 2 ? "Profile" : "Safety"}
+                            </span>
+                            {num !== 3 && (
+                                <div className={`absolute top-5 left-1/2 w-full h-[2px] -z-10 ${step > num ? "bg-primary/50" : "bg-white/5"}`} />
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <div className="w-full max-w-2xl relative z-10">
