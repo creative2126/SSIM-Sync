@@ -302,6 +302,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                     body: msg.length > 50 ? msg.substring(0, 47) + "..." : msg
                 })
             }).catch(e => console.warn("Background notification failed:", e));
+
+            // 📧 Trigger Smart Email Notification (Offline only)
+            fetch("/api/notify-email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    targetUserId: id,
+                    senderAlias: myProfile?.alias || "Anonymous Student",
+                    messageSnippet: msg.length > 50 ? msg.substring(0, 47) + "..." : msg
+                })
+            }).catch(e => console.warn("Email notification failed:", e));
         }
     };
 
