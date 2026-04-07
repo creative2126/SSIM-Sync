@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageSquare, User, Shield, Zap } from "lucide-react";
+import { Home, MessageSquare, User, Shield, Zap, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNotifications } from "@/hooks/useNotifications";
 
@@ -14,7 +14,7 @@ export default function Navigation() {
     if (pathname === "/" || pathname === "/login" || pathname === "/signup") return null;
 
     const tabs = [
-        { name: "Discover", icon: <Home className="w-5 h-5" />, path: "/feed" },
+        { name: "Discover", icon: <Search className="w-5 h-5" />, path: "/discover" },
         { name: "Vibes", icon: <Zap className="w-5 h-5" />, path: "/vibes" },
         { name: "Chats", icon: <MessageSquare className="w-5 h-5" />, path: "/matches", badge: unreadCount },
         { name: "Profile", icon: <User className="w-5 h-5" />, path: "/profile" },
