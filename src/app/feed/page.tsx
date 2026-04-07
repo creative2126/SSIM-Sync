@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Loader2, Heart, X, MessageCircleHeart, ShieldCheck } from "lucide-react";
+import { Loader2, Heart, X, MessageCircleHeart, ShieldCheck, Search, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import StoryBar from "@/components/StoryBar";
 
@@ -18,6 +18,9 @@ export default function FeedPage() {
     const [selectedProfileStories, setSelectedProfileStories] = useState<any[]>([]);
     const [initiationsToday, setInitiationsToday] = useState(0);
     const [timeLeft, setTimeLeft] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchResults, setSearchResults] = useState<any[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
     useEffect(() => {
         fetchFeed();
         fetchInteractionCount();
@@ -61,6 +64,7 @@ export default function FeedPage() {
     };
 
     const fetchFeed = async () => {
+        setLoading(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
@@ -68,7 +72,7 @@ export default function FeedPage() {
                 return;
             }
 
-            // 1. Get current user's public profile for gender and vibe_scores
+            // 1. Get current user's profile
             const { data: myProfile } = await supabase
                 .from("profiles_public")
                 .select("*")
@@ -81,12 +85,12 @@ export default function FeedPage() {
             // 2. Strict Heterosexual matching filter
             const targetGender = myProfile.gender === "Male" ? "Female" : "Male";
 
-            // 3. Get existing matches, blocks, AND passes to exclude
+            // 3. Exclude existing matches, blocks, and passes
             const [
-                { data: existingMatches, error: matchesErr },
-                { data: myBlocks, error: blocksErr },
-                { data: blockedMe, error: blockedMeErr },
-                { data: myPasses, error: passesErr }
+                { data: existingMatches },
+                { data: myBlocks },
+                { data: blockedMe },
+                { data: myPasses }
             ] = await Promise.all([
                 supabase.from("matches").select("user_1_id, user_2_id").or(`user_1_id.eq.${session.user.id},user_2_id.eq.${session.user.id}`),
                 supabase.from("blocks").select("blocked_id").eq("blocker_id", session.user.id),
@@ -94,15 +98,9 @@ export default function FeedPage() {
                 supabase.from("feed_passes").select("target_id").eq("user_id", session.user.id)
             ]);
 
-            if (passesErr) console.error("Error fetching feed_passes:", passesErr);
-
             const excludedIds = new Set<string>();
             excludedIds.add(session.user.id);
-
-            existingMatches?.forEach(m => {
-                excludedIds.add(m.user_1_id);
-                excludedIds.add(m.user_2_id);
-            });
+            existingMatches?.forEach(m => { excludedIds.add(m.user_1_id); excludedIds.add(m.user_2_id); });
             myBlocks?.forEach(b => excludedIds.add(b.blocked_id));
             blockedMe?.forEach(b => excludedIds.add(b.blocker_id));
             myPasses?.forEach(p => excludedIds.add(p.target_id));
@@ -118,14 +116,9 @@ export default function FeedPage() {
                     let score = 50;
                     const myVibes = myProfile.vibe_scores || {};
                     const theirVibes = p.vibe_scores || {};
-
-                    Object.keys(myVibes).forEach(qId => {
-                        if (myVibes[qId] === theirVibes[qId]) score += 12;
-                    });
-
+                    Object.keys(myVibes).forEach(qId => { if (myVibes[qId] === theirVibes[qId]) score += 12; });
                     return { ...p, compatibility: Math.min(score, 99) };
                 });
-
                 scoredMatches.sort((a, b) => b.compatibility - a.compatibility);
                 setProfiles(scoredMatches);
             }
@@ -133,6 +126,35 @@ export default function FeedPage() {
             console.error(err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSearch = async (val: string) => {
+        setSearchQuery(val);
+        if (!val.trim()) {
+            setSearchResults([]);
+            setIsSearching(false);
+            return;
+        }
+
+        setIsSearching(true);
+        const { data } = await supabase
+            .from("profiles_public")
+            .select("id, alias, gender, verification_status, vibe_scores, bio")
+            .neq("id", currentUser?.id || "")
+            .ilike("alias", `%${val}%`)
+            .limit(10);
+
+        // Add compatibility scores to search results
+        if (data) {
+            const scored = data.map(p => {
+                let score = 50;
+                const myVibes = currentUser?.vibe_scores || {};
+                const theirVibes = p.vibe_scores || {};
+                Object.keys(myVibes).forEach(qId => { if (myVibes[qId] === theirVibes[qId]) score += 12; });
+                return { ...p, compatibility: Math.min(score, 99) };
+            });
+            setSearchResults(scored);
         }
     };
 
@@ -196,26 +218,87 @@ export default function FeedPage() {
         <main className="min-h-screen bg-midnight relative flex flex-col items-center py-6 overflow-hidden px-4">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo/20 to-midnight pointer-events-none" />
             <div className="mobile-container relative z-10 flex flex-col flex-1 h-full">
-                <header className="flex justify-between items-center mb-6">
-                    <h1 className="text-xl font-bold tracking-tight">Discover</h1>
-                    <div className="flex flex-col items-end">
-                        <div className="flex gap-1">
-                            {[1, 2, 3].map(i => (
-                                <div key={i} className={`w-2 h-2 rounded-full ${i <= (3 - initiationsToday) ? "bg-primary shadow-[0_0_8px_rgba(109,93,254,0.6)]" : "bg-white/10"}`} />
-                            ))}
+                <header className="flex flex-col gap-4 mb-6">
+                    <div className="flex justify-between items-center">
+                        <h1 className="text-xl font-bold tracking-tight">Discover</h1>
+                        <div className="flex flex-col items-end">
+                            <div className="flex gap-1">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className={`w-2 h-2 rounded-full ${i <= (3 - initiationsToday) ? "bg-primary shadow-[0_0_8px_rgba(109,93,254,0.6)]" : "bg-white/10"}`} />
+                                ))}
+                            </div>
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 mt-1">
+                                {3 - initiationsToday} vibes left • Refill in {timeLeft}
+                            </span>
                         </div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 mt-1">
-                            {3 - initiationsToday} vibes left • Refill in {timeLeft}
-                        </span>
+                    </div>
+
+                    {/* Search Bar */}
+                    <div className="relative group">
+                        <div className="absolute inset-0 bg-primary/20 rounded-2xl blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+                        <div className="relative flex items-center bg-white/5 border border-white/5 rounded-2xl px-4 py-2 focus-within:border-primary/50 transition-all">
+                            <Search className="w-4 h-4 text-foreground/30 group-focus-within:text-primary transition-colors" />
+                            <input
+                                type="text"
+                                value={searchQuery}
+                                onChange={(e) => handleSearch(e.target.value)}
+                                placeholder="Search by alias..."
+                                className="bg-transparent border-none focus:ring-0 text-sm text-white placeholder:text-foreground/20 w-full ml-2 py-1"
+                            />
+                            {searchQuery && (
+                                <button onClick={() => handleSearch("")} className="p-1 hover:bg-white/10 rounded-full transition text-foreground/20">
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </header>
 
                 {/* Campus Stories */}
-                <StoryBar />
+                {!isSearching && <StoryBar />}
 
-                <div className="relative flex-1 min-h-[400px]">
-                    <AnimatePresence mode="popLayout">
-                        {currentIndex < profiles.length ? (
+                <div className="relative flex-1 min-h-[400px] mt-2">
+                    <AnimatePresence mode="wait">
+                        {isSearching ? (
+                            <motion.div
+                                key="search-results"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="flex flex-col gap-4 overflow-y-auto pb-20 scrollbar-hide"
+                            >
+                                {searchResults.length === 0 ? (
+                                    <div className="text-center py-20 opacity-20">
+                                        <Search className="w-12 h-12 mx-auto mb-4" />
+                                        <p className="font-bold">No students found</p>
+                                    </div>
+                                ) : (
+                                    searchResults.map((profile) => (
+                                        <div
+                                            key={profile.id}
+                                            onClick={() => router.push(`/chat/${profile.id}`)}
+                                            className="glass-panel p-5 rounded-3xl border border-white/5 flex items-center justify-between group hover:border-primary/30 transition-all cursor-pointer active:scale-95"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-12 h-12 rounded-2xl bg-indigo/30 flex items-center justify-center text-primary border border-white/5">
+                                                    <Sparkles className="w-6 h-6" />
+                                                </div>
+                                                <div>
+                                                    <h3 className="font-bold text-white flex items-center gap-2">
+                                                        {profile.alias}
+                                                        <span className="text-[10px] text-primary">{profile.compatibility}%</span>
+                                                    </h3>
+                                                    <p className="text-[9px] uppercase tracking-widest text-foreground/30 font-black">{profile.gender}</p>
+                                                </div>
+                                            </div>
+                                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-white transition-all">
+                                                <MessageCircleHeart className="w-5 h-5" />
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </motion.div>
+                        ) : currentIndex < profiles.length ? (
                             <motion.div
                                 key={profiles[currentIndex].id}
                                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
