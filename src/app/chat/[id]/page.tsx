@@ -24,6 +24,14 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
     const [blocking, setBlocking] = useState(false);
     const [safetyError, setSafetyError] = useState<string | null>(null);
     const [showRevealModal, setShowRevealModal] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<any>(null);
+
+    // Advanced Chat States
+    const [isOnline, setIsOnline] = useState(false);
+    const [lastSeen, setLastSeen] = useState<string | null>(null);
+    const [isOtherTyping, setIsOtherTyping] = useState(false);
+    const typingTimeoutRef = useRef<any>(null);
+
     const scrollRef = useRef<HTMLDivElement>(null);
 
     // Determine current user position (u1 or u2)
@@ -78,7 +86,34 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                             console.log("Match updated (Reveal sync):", payload.new);
                             setMatchData(payload.new);
                         }
-                    ).subscribe();
+                    )
+                    .on('postgres_changes', {
+                        event: 'UPDATE',
+                        schema: 'public',
+                        table: 'profiles_public',
+                        filter: `id=eq.${id}`
+                    }, (payload) => {
+                        setOtherProfile(payload.new);
+                        setLastSeen(payload.new.last_seen);
+                    })
+                    .on('presence', { event: 'sync' }, () => {
+                        const state = matchChannel.presenceState();
+                        const onlineUsers = Object.values(state).flat();
+                        setIsOnline(onlineUsers.some((u: any) => u.user_id === id));
+                    })
+                    .on('broadcast', { event: 'typing' }, ({ payload }: any) => {
+                        if (payload.userId === id) {
+                            setIsOtherTyping(payload.isTyping);
+                        }
+                    })
+                    .subscribe(async (status: string) => {
+                        if (status === 'SUBSCRIBED') {
+                            await matchChannel.track({ user_id: session?.user.id, online_at: new Date().toISOString() });
+                        }
+                    });
+
+                // Update my last seen on connect
+                await supabase.from("profiles_public").update({ last_seen: new Date().toISOString() }).eq("id", session?.user.id);
 
                 // Mark as read initially
                 markAsRead(match.id);
@@ -140,8 +175,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         // Fetch other profile (if fully revealed, we might want to fetch real photo later)
         const { data: other } = await supabase.from("profiles_public").select("*").eq("id", id).single();
         setOtherProfile(other);
+        setLastSeen(other?.last_seen);
 
-        const { data: previousMsgs } = await supabase.from("messages").select("*").eq("match_id", currentMatch.id).order("created_at", { ascending: true });
+        const { data: previousMsgs } = await supabase
+            .from("messages")
+            .select(`
+                *,
+                reply_message:reply_to_id (id, content, sender_id)
+            `)
+            .eq("match_id", currentMatch.id)
+            .order("created_at", { ascending: true });
+
         if (previousMsgs) setMessages(previousMsgs);
         setLoading(false);
         return currentMatch;
@@ -186,17 +230,42 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
 
         const msg = newMessage;
         setNewMessage("");
+        const replyId = replyingTo?.id;
+        const replyMsg = replyingTo;
+        setReplyingTo(null);
+
         const tempId = "temp-" + Date.now();
-        const optimisticMsg = { id: tempId, match_id: matchData.id, sender_id: session.user.id, content: msg, created_at: new Date().toISOString() };
+        const optimisticMsg = {
+            id: tempId,
+            match_id: matchData.id,
+            sender_id: session.user.id,
+            content: msg,
+            created_at: new Date().toISOString(),
+            reply_to_id: replyId,
+            reply_message: replyMsg,
+            reactions: []
+        };
         setMessages(prev => [...prev, optimisticMsg]);
 
-        const { error, data } = await supabase.from("messages").insert({ match_id: matchData.id, sender_id: session.user.id, content: msg }).select().single();
+        const { error, data } = await supabase.from("messages")
+            .insert({
+                match_id: matchData.id,
+                sender_id: session.user.id,
+                content: msg,
+                reply_to_id: replyId
+            })
+            .select(`
+                *,
+                reply_message:reply_to_id (id, content, sender_id)
+            `)
+            .single();
+
         if (error) {
             setMessages(prev => prev.filter(m => m.id !== tempId));
             setNewMessage(msg);
         } else if (data) {
             setMessages(prev => prev.map(m => m.id === tempId ? data : m));
-
+            // Rest of the STREAK and NOTIFICATION logic...
             // Streak & Last Message Logic
             const now = new Date();
             const lastMsgAt = matchData.last_message_at ? new Date(matchData.last_message_at) : null;
@@ -234,6 +303,41 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 })
             }).catch(e => console.warn("Background notification failed:", e));
         }
+    };
+
+    const handleTyping = () => {
+        const channel = supabase.channel(`match_status_${matchData.id}`);
+        channel.send({
+            type: 'broadcast',
+            event: 'typing',
+            payload: { userId: session.user.id, isTyping: true }
+        });
+
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => {
+            channel.send({
+                type: 'broadcast',
+                event: 'typing',
+                payload: { userId: session.user.id, isTyping: false }
+            });
+        }, 3000);
+    };
+
+    const toggleReaction = async (message: any, emoji: string) => {
+        const reactions = message.reactions || [];
+        const existing = reactions.find((r: any) => r.emoji === emoji && r.userId === session.user.id);
+        let newReactions;
+
+        if (existing) {
+            newReactions = reactions.filter((r: any) => !(r.emoji === emoji && r.userId === session.user.id));
+        } else {
+            newReactions = [...reactions, { emoji, userId: session.user.id }];
+        }
+
+        // Optimistic update
+        setMessages(prev => prev.map(m => m.id === message.id ? { ...m, reactions: newReactions } : m));
+
+        await supabase.from("messages").update({ reactions: newReactions }).eq("id", message.id);
     };
 
     const approveReveal = async () => {
@@ -301,9 +405,9 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                             {otherProfile?.verification_status === 'verified' && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-1.5">
-                            <div className={`w-1.5 h-1.5 rounded-full ${syncStatus === 'connected' ? 'bg-emerald-500' : 'bg-red-500 animate-pulse'}`} />
-                            <span className="text-[9px] text-foreground/40 uppercase tracking-widest font-bold">
-                                {isFullyRevealed ? "Identity Unlocked" : "Anonymous Connection"}
+                            <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-foreground/20'}`} />
+                            <span className="text-[9px] text-foreground/40 uppercase tracking-widest font-black">
+                                {isOtherTyping ? "Typing..." : isOnline ? "Online Now" : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Offline"}
                             </span>
                         </div>
                     </div>
@@ -418,23 +522,57 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                                     key={m.id || idx}
                                     initial={{ opacity: 0, scale: 0.95, y: 5 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    className={`flex flex-col ${isMe ? "items-end" : "items-start"} ${isSameSenderAsNext ? "mb-1" : "mb-4"}`}
+                                    className={`group flex flex-col ${isMe ? "items-end" : "items-start"} ${isSameSenderAsNext ? "mb-1" : "mb-4"}`}
                                 >
-                                    <div
-                                        style={{ borderRadius }}
-                                        className={`px-5 py-3 max-w-[85%] text-sm font-medium transition-all ${isMe ? "bg-primary text-white shadow-lg shadow-primary/10" : "bg-white/5 text-foreground/90 border border-white/5"}`}
-                                    >
-                                        {m.content}
+                                    <div className="relative max-w-[85%] flex items-center gap-2">
+                                        {!isMe && (
+                                            <button onClick={() => setReplyingTo(m)} className="opacity-0 group-hover:opacity-100 p-2 text-foreground/20 hover:text-primary transition-all">
+                                                <RefreshCw className="w-4 h-4 rotate-180" />
+                                            </button>
+                                        )}
+
+                                        <div className="flex flex-col">
+                                            {/* Reply Bubble */}
+                                            {m.reply_message && (
+                                                <div className={`mb-[-8px] px-4 py-2 bg-white/5 border border-white/5 rounded-2xl text-[10px] opacity-60 italic truncate max-w-[200px] ${isMe ? "bg-primary/30 border-primary/20" : ""}`}>
+                                                    {m.reply_message.content}
+                                                </div>
+                                            )}
+
+                                            <div
+                                                style={{ borderRadius }}
+                                                className={`px-5 py-3 text-sm font-medium transition-all relative ${isMe ? "bg-primary text-white shadow-lg shadow-primary/10" : "bg-white/5 text-foreground/90 border border-white/5"}`}
+                                                onDoubleClick={() => !isMe && toggleReaction(m, "❤️")}
+                                            >
+                                                {m.content}
+
+                                                {/* Reactions Area */}
+                                                {m.reactions?.length > 0 && (
+                                                    <div className={`absolute -bottom-2 ${isMe ? "right-2" : "left-2"} flex gap-1`}>
+                                                        {Array.from(new Set(m.reactions.map((r: any) => r.emoji))).map((emoji: any) => (
+                                                            <div key={emoji} className="bg-midnight/100 border border-white/10 rounded-full px-1.5 py-0.5 text-[10px] shadow-xl flex items-center">
+                                                                {emoji} <span className="ml-1 text-[8px] opacity-60 font-bold">{m.reactions.filter((r: any) => r.emoji === emoji).length}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {isMe && (
+                                            <button onClick={() => setReplyingTo(m)} className="opacity-0 group-hover:opacity-100 p-2 text-foreground/20 hover:text-primary transition-all">
+                                                <RefreshCw className="w-4 h-4" />
+                                            </button>
+                                        )}
                                     </div>
 
-                                    {/* Show "Seen" only for the last 'me' message if it's actually seen */}
+                                    {/* Same logic for "Seen" and time... */}
                                     {isMe && !isSameSenderAsNext && m.read_at && idx === messages.length - 1 && (
                                         <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-[9px] text-primary font-bold uppercase tracking-tighter mt-1 px-1">
                                             Seen
                                         </motion.span>
                                     )}
 
-                                    {/* Show time only if there's a gap or it's the last in a group */}
                                     {!isSameSenderAsNext && !m.read_at && (
                                         <span className="text-[9px] text-foreground/20 mt-1 px-1">
                                             {msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -452,6 +590,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             {/* Input area */}
             <div className="p-4 bg-midnight/90 backdrop-blur-xl border-t border-white/5 pb-[calc(env(safe-area-inset-bottom,1.5rem)+1rem)] relative">
                 <AnimatePresence>
+                    {replyingTo && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mb-4 p-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-between">
+                            <div className="flex flex-col gap-1 border-l-2 border-primary pl-4">
+                                <span className="text-[10px] text-primary font-black uppercase tracking-widest">Replying to Message</span>
+                                <span className="text-xs text-foreground/60 truncate max-w-[200px]">{replyingTo.content}</span>
+                            </div>
+                            <button onClick={() => setReplyingTo(null)} className="p-2 text-foreground/20 hover:text-white">
+                                <XCircle className="w-5 h-5" />
+                            </button>
+                        </motion.div>
+                    )}
                     {safetyError && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-4 right-4 mb-4 p-4 bg-red-500/20 backdrop-blur-md border border-red-500/30 rounded-2xl flex items-center gap-3 text-red-100 text-xs font-bold shadow-2xl">
                             <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
@@ -461,8 +610,17 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                 </AnimatePresence>
 
                 <form onSubmit={handleSendMessage} className="max-w-xl mx-auto flex gap-3">
-                    <input type="text" value={newMessage} onChange={e => setNewMessage(e.target.value)} placeholder="Type a message..." className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-white placeholder:text-white/20 transition-all font-medium" />
-                    <button type="submit" disabled={!newMessage.trim()} className="w-14 h-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 disabled:opacity-50">
+                    <input
+                        type="text"
+                        value={newMessage}
+                        onChange={e => {
+                            setNewMessage(e.target.value);
+                            handleTyping();
+                        }}
+                        placeholder="Type a message..."
+                        className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 focus:outline-none focus:border-primary/50 text-white placeholder:text-white/20 transition-all font-medium"
+                    />
+                    <button type="submit" disabled={!newMessage.trim()} className="w-14 h-14 bg-primary text-white rounded-2xl flex items-center justify-center shadow-xl shadow-primary/20 disabled:opacity-50 transition-all">
                         <Send className="w-6 h-6 ml-0.5" />
                     </button>
                 </form>

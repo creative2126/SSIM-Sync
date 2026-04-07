@@ -33,11 +33,12 @@ export default function VibesPage() {
     const [selectedProfile, setSelectedProfile] = useState<any>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
 
-    // Comment states
+    // Interaction states
     const [expandedVibeId, setExpandedVibeId] = useState<string | null>(null);
     const [comments, setComments] = useState<{ [key: string]: any[] }>({});
     const [newComment, setNewComment] = useState("");
     const [isCommenting, setIsCommenting] = useState(false);
+    const [userLikes, setUserLikes] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         initVibes();
@@ -49,19 +50,44 @@ export default function VibesPage() {
 
         await fetchVibes();
 
-        // Realtime subscription
+        // Realtime subscription for Vibes, Comments, and Likes
         const channel = supabase
-            .channel('public_vibes')
+            .channel('vibes_realtime')
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vibes' }, async (payload) => {
-                // Fetch profile for the new vibe
                 const { data: profile } = await supabase
                     .from("profiles_public")
                     .select("alias, gender")
                     .eq("id", payload.new.user_id)
                     .single();
 
-                const vibeWithProfile = { ...payload.new, profiles_public: profile };
+                const vibeWithProfile = { ...payload.new, profiles_public: profile, vibe_comments: [{ count: 0 }], vibe_likes: [{ count: 0 }] };
                 setVibes(prev => [vibeWithProfile, ...prev]);
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vibe_comments' }, async (payload) => {
+                const vibeId = payload.new.vibe_id;
+                // Update local counts
+                setVibes(prev => prev.map(v => 
+                    v.id === vibeId 
+                        ? { ...v, vibe_comments: [{ count: (v.vibe_comments?.[0]?.count || 0) + 1 }] } 
+                        : v
+                ));
+                // Fetch full comment if this post is currently expanded
+                if (expandedVibeId === vibeId) {
+                    fetchComments(vibeId);
+                }
+            })
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'vibe_likes' }, async (payload) => {
+                setVibes(prev => prev.map(v => 
+                    v.id === payload.new.vibe_id 
+                        ? { ...v, vibe_likes: [{ count: (v.vibe_likes?.[0]?.count || 0) + 1 }] } 
+                        : v
+                ));
+            })
+            .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'vibe_likes' }, async (payload) => {
+                // Note: payload.old for DELETE might only have the id or PKs
+                // This is a bit tricky for real-time without specific payload info, 
+                // but we can re-fetch or just ignore for unlikes as it's less critical.
+                await fetchVibes(); // Safe fallback for unlikes
             })
             .subscribe();
 
@@ -95,7 +121,8 @@ export default function VibesPage() {
                     created_at,
                     user_id,
                     profiles_public (id, alias, gender, verification_status),
-                    vibe_comments(count)
+                    vibe_comments (count),
+                    vibe_likes (count)
                 `)
                 .order("created_at", { ascending: false });
 
@@ -110,6 +137,18 @@ export default function VibesPage() {
                 alert(`Database Error: ${error.message || "Table 'vibes' not found. Did you run the SQL?"}`);
             } else {
                 setVibes(data || []);
+                
+                // Fetch my likes if session exists
+                if (currentSession) {
+                    const { data: myLikes } = await supabase
+                        .from("vibe_likes")
+                        .select("vibe_id")
+                        .eq("user_id", currentSession.user.id);
+                    
+                    if (myLikes) {
+                        setUserLikes(new Set(myLikes.map(l => l.vibe_id)));
+                    }
+                }
             }
         } catch (err) {
             console.error("Error fetching vibes:", err);
@@ -187,6 +226,30 @@ export default function VibesPage() {
             if (!comments[vibeId]) {
                 fetchComments(vibeId);
             }
+        }
+    };
+
+    const toggleLike = async (vibeId: string) => {
+        if (!session) return router.push("/login");
+
+        const isLiked = userLikes.has(vibeId);
+        
+        // Optimistic UI update
+        const newLikes = new Set(userLikes);
+        if (isLiked) newLikes.delete(vibeId);
+        else newLikes.add(vibeId);
+        setUserLikes(newLikes);
+
+        setVibes(prev => prev.map(v => 
+            v.id === vibeId 
+                ? { ...v, vibe_likes: [{ count: (v.vibe_likes?.[0]?.count || 0) + (isLiked ? -1 : 1) }] } 
+                : v
+        ));
+
+        if (isLiked) {
+            await supabase.from("vibe_likes").delete().eq("vibe_id", vibeId).eq("user_id", session.user.id);
+        } else {
+            await supabase.from("vibe_likes").insert({ vibe_id: vibeId, user_id: session.user.id });
         }
     };
 
@@ -348,6 +411,18 @@ export default function VibesPage() {
                                     className="flex-1 py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs border border-white/5 transition-all active:scale-95"
                                 >
                                     Profile
+                                </button>
+                                <button
+                                    onClick={() => toggleLike(vibe.id)}
+                                    className={`w-14 py-3.5 rounded-2xl font-bold text-xs border transition-all active:scale-95 flex items-center justify-center gap-1 ${userLikes.has(vibe.id) ? 'bg-orange-500/20 border-orange-500/50 text-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'bg-white/5 border-white/5 text-foreground/40 hover:bg-white/10'}`}
+                                >
+                                    <motion.div
+                                        animate={userLikes.has(vibe.id) ? { scale: [1, 1.4, 1], rotate: [0, -10, 10, 0] } : {}}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <Zap className={`w-4 h-4 ${userLikes.has(vibe.id) ? 'fill-orange-500' : ''}`} />
+                                    </motion.div>
+                                    <span className="text-[10px]">{vibe.vibe_likes?.[0]?.count || 0}</span>
                                 </button>
                                 <button
                                     onClick={() => toggleComments(vibe.id)}
