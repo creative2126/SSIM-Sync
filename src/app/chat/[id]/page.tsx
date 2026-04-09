@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Loader2, Send, LockOpen, ArrowLeft, Shield, RefreshCw, ShieldCheck, ChevronRight, AlertCircle, XCircle, UserCheck, Info, Check, CheckCheck, Sparkles } from "lucide-react";
 
 import { checkContentSafety } from "@/lib/utils/safety";
+import { formatLastSeen } from "@/lib/utils/time";
+
 
 export default function ChatPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = React.use(params);
@@ -418,7 +420,7 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                         <div className="flex items-center gap-1.5 mt-1.5">
                             <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-foreground/20'}`} />
                             <span className="text-[9px] text-foreground/40 uppercase tracking-widest font-black">
-                                {isOtherTyping ? "Typing..." : isOnline ? "Online Now" : lastSeen ? `Last seen ${new Date(lastSeen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : "Offline"}
+                                {isOtherTyping ? "Typing..." : isOnline ? "Online Now" : formatLastSeen(lastSeen)}
                             </span>
                         </div>
                     </div>

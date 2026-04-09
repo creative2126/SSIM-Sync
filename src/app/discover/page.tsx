@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { Search, Loader2, UserCircle2, Zap, MessageSquare, ShieldCheck, Heart, Sparkles, Filter, X } from "lucide-react";
+import { formatLastSeen } from "@/lib/utils/time";
+
 
 export default function DiscoverPage() {
     const router = useRouter();
@@ -167,6 +169,9 @@ export default function DiscoverPage() {
                                                 <span className="w-1 h-1 rounded-full bg-white/10" />
                                                 <span className="text-primary italic">"{(profile.vibe_scores?.q1) || "New Vibe"}"</span>
                                             </div>
+                                            <p className="text-[8px] uppercase tracking-tighter text-foreground/20 font-black mt-1">
+                                                {formatLastSeen(profile.last_seen)}
+                                            </p>
                                         </div>
                                         <button
                                             onClick={() => connectWithUser(profile.id)}

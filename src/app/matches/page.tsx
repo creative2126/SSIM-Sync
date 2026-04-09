@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Loader2, MessageSquare, ShieldCheck, ChevronRight, Sparkles } from "lucide-react";
+import { Loader2, MessageSquare, ShieldCheck, ChevronRight, Sparkles, Clock } from "lucide-react";
+import { formatLastSeen } from "@/lib/utils/time";
+
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -50,8 +52,8 @@ export default function MatchesPage() {
                     u2_reveal_approved,
                     streak_count,
                     created_at,
-                    user1:profiles_public!user_1_id (alias, real_name, gender, verification_status),
-                    user2:profiles_public!user_2_id (alias, real_name, gender, verification_status),
+                    user1:profiles_public!user_1_id (alias, real_name, gender, verification_status, last_seen),
+                    user2:profiles_public!user_2_id (alias, real_name, gender, verification_status, last_seen),
                     messages (read_at, sender_id)
                 `)
                 .or(`user_1_id.eq.${session.user.id},user_2_id.eq.${session.user.id}`)
@@ -152,6 +154,12 @@ export default function MatchesPage() {
                                         <span>{match.is_revealed ? "Full Identity" : "Anonymous"}</span>
                                         <span className="w-1 h-1 rounded-full bg-white/10" />
                                         <span>Matched {new Date(match.created_at).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                        <div className={`w-1 h-1 rounded-full ${new Date().getTime() - new Date(match.partnerProfile.last_seen || 0).getTime() < 300000 ? "bg-emerald-500" : "bg-foreground/10"}`} />
+                                        <span className="text-[8px] text-foreground/20 uppercase font-black tracking-tighter">
+                                            {formatLastSeen(match.partnerProfile.last_seen)}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
