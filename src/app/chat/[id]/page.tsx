@@ -536,6 +536,19 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
                                     initial={{ opacity: 0, scale: 0.95, y: 5 }}
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     className={`group flex flex-col ${isMe ? "items-end" : "items-start"} ${isSameSenderAsNext ? "mb-1" : "mb-4"}`}
+                                    drag="x"
+                                    dragConstraints={{ left: 0, right: 0 }}
+                                    dragElastic={0.15}
+                                    dragDirectionLock
+                                    onDragEnd={(e, { offset }) => {
+                                        if (isMe && offset.x < -50) {
+                                            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+                                            setReplyingTo(m);
+                                        } else if (!isMe && offset.x > 50) {
+                                            if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+                                            setReplyingTo(m);
+                                        }
+                                    }}
                                 >
                                     <div className="relative max-w-[85%] flex items-center gap-2">
                                         {!isMe && (
