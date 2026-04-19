@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 
 // Initialize Supabase Admin (needed to bypass RLS for checking last_seen/last_email)
 const supabaseAdmin = createClient(
@@ -22,6 +23,14 @@ export async function POST(req: Request) {
             return NextResponse.json({ sent: false, reason: "Notifications disabled or user not found" });
         }
 
+        // Fetch actual user email from Supabase Auth admin
+        const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(targetUserId);
+        const userEmail = userData?.user?.email;
+
+        if (!userEmail) {
+            return NextResponse.json({ sent: false, reason: "User email not found in Auth" });
+        }
+
         // 2. CHECK RULES: Don't spam
         const now = new Date();
         const lastSeen = profile.last_seen ? new Date(profile.last_seen) : new Date(0);
@@ -39,13 +48,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ sent: false, reason: "Wait period for email not reached" });
         }
 
-        // 3. SEND EMAIL (Example integration with Resend)
-        // Note: You need to set RESEND_API_KEY in your .env.local
-        const RESEND_API_KEY = process.env.RESEND_API_KEY;
+        // 3. SEND EMAIL (Nodemailer + Gmail)
+        const { GMAIL_USER, GMAIL_APP_PASSWORD } = process.env;
         
-        if (!RESEND_API_KEY) {
-            console.warn("RESEND_API_KEY not found. Skipping email send.");
-            return NextResponse.json({ sent: false, error: "API Key Missing" });
+        if (!GMAIL_USER || !GMAIL_APP_PASSWORD) {
+            console.warn("Gmail credentials not found. Skipping email send.");
+            return NextResponse.json({ sent: false, error: "Gmail Credentials Missing" });
         }
 
         // Create HTML Email Template
@@ -65,29 +73,30 @@ export async function POST(req: Request) {
             </div>
         `;
 
-        const res = await fetch("https://api.resend.com/emails", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${RESEND_API_KEY}`
-            },
-            body: JSON.stringify({
-                from: "SSIM Sync <no-reply@ssim-sync.com>", // You'll need to verify your domain on Resend
-                to: profile.user_email || profile.id, // Assuming user_email is stored or reachable
-                subject: "You have a new anonymous message 🔒",
-                html: emailHtml
-            })
+        const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: GMAIL_USER,
+                pass: GMAIL_APP_PASSWORD
+            }
+        });
+
+        const info = await transporter.sendMail({
+            from: \`"SSIM Sync" <\${GMAIL_USER}>\`,
+            to: userEmail,
+            subject: "You have a new anonymous message 🔒",
+            html: emailHtml
         });
 
         // 4. Update last_email_at if sent successfully
-        if (res.ok) {
+        if (info.messageId) {
             await supabaseAdmin
                 .from("profiles_public")
                 .update({ last_email_at: now.toISOString() })
                 .eq("id", targetUserId);
         }
 
-        return NextResponse.json({ sent: res.ok });
+        return NextResponse.json({ sent: !!info.messageId });
 
     } catch (err) {
         console.error("Email API Error:", err);
