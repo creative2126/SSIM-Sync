@@ -23,6 +23,9 @@ export default function AdminDashboard() {
     const [loadingUsers, setLoadingUsers] = useState(true);
     const [allMessages, setAllMessages] = useState<any[]>([]);
     const [loadingMessages, setLoadingMessages] = useState(true);
+    const [showVibes, setShowVibes] = useState(false);
+    const [showChats, setShowChats] = useState(false);
+    const [selectedChatUser, setSelectedChatUser] = useState<any | null>(null);
 
 
     useEffect(() => {
@@ -102,7 +105,7 @@ export default function AdminDashboard() {
             .from("messages")
             .select("*")
             .order("created_at", { ascending: false })
-            .limit(50);
+            .limit(500);
 
         if (msgError) {
             console.error("Messages Error:", msgError);
@@ -359,25 +362,33 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="mb-12">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={() => setShowVibes(!showVibes)}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
                                 <Zap className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white">Vibe Moderator</h2>
-                                <p className="text-foreground/40 text-xs">Remove harmful or inappropriate campus stories</p>
+                                <h2 className="text-xl font-bold text-white group-hover:text-primary transition-colors">Vibe Monitor / Moderator</h2>
+                                <p className="text-foreground/40 text-xs">Click to {showVibes ? 'hide' : 'view'} and manage campus stories</p>
                             </div>
                         </div>
-                        <button
-                            onClick={fetchActiveStories}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all"
-                            title="Refresh Vibes"
-                        >
-                            <Loader2 className={`w-4 h-4 ${loadingStories ? 'animate-spin' : ''}`} />
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); fetchActiveStories(); }}
+                                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all"
+                                title="Refresh Vibes"
+                            >
+                                <Loader2 className={`w-4 h-4 ${loadingStories ? 'animate-spin' : ''}`} />
+                            </button>
+                            <button 
+                                className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-all border border-primary/30"
+                            >
+                                {showVibes ? 'Close' : 'Open'}
+                            </button>
+                        </div>
                     </div>
 
+                    {showVibes && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {stories.length === 0 ? (
                             <div className="col-span-full py-12 flex flex-col items-center justify-center bg-white/5 rounded-3xl border border-white/5 italic text-foreground/30 text-sm">
@@ -418,6 +429,7 @@ export default function AdminDashboard() {
                             ))
                         )}
                     </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -546,54 +558,117 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="mb-12">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={() => setShowChats(!showChats)}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
                                 <MessageCircleHeart className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white">Campus Chatter (God Mode)</h2>
-                                <p className="text-foreground/40 text-xs">Real-time monitor of student interactions (Last 50 messages)</p>
+                                <h2 className="text-xl font-bold text-white group-hover:text-primary transition-colors">Campus Chatter (God Mode)</h2>
+                                <p className="text-foreground/40 text-xs">Click to {showChats ? 'hide' : 'view'} student interactions</p>
                             </div>
                         </div>
-                        <button
-                            onClick={fetchMessages}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
-                        >
-                            <Loader2 className={`w-3 h-3 ${loadingMessages ? 'animate-spin' : ''}`} />
-                            Live Sync
-                        </button>
-                    </div>
-
-                    <div className="glass-panel rounded-[2rem] border border-white/5 overflow-hidden">
-                        <div className="max-h-[400px] overflow-y-auto">
-                            {allMessages.length === 0 ? (
-                                <div className="p-12 text-center text-foreground/30 italic text-sm">
-                                    Campus is currently quiet.
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-white/5">
-                                    {allMessages.map((msg) => {
-                                        const senderAlias = allUsers.find(u => u.id === msg.sender_id)?.alias || "Unknown";
-                                        const match = msg._match;
-                                        const receiverId = match ? (match.user_1_id === msg.sender_id ? match.user_2_id : match.user_1_id) : null;
-                                        const receiverAlias = receiverId ? (allUsers.find(u => u.id === receiverId)?.alias || "Stranger") : "Stranger";
-                                        return (
-                                            <div key={msg.id} className="px-6 py-4 flex flex-col gap-1 hover:bg-white/[0.02]">
-                                                <div className="flex items-center gap-2 text-[10px] font-bold">
-                                                    <span className="text-primary uppercase tracking-widest">{senderAlias}</span>
-                                                    <ArrowRight className="w-3 h-3 text-foreground/20" />
-                                                    <span className="text-white uppercase tracking-widest">{receiverAlias}</span>
-                                                    <span className="ml-auto text-foreground/20 font-mono">{new Date(msg.created_at).toLocaleTimeString()}</span>
-                                                </div>
-                                                <p className="text-sm text-foreground/70 leading-relaxed">{msg.content}</p>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); fetchMessages(); }}
+                                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
+                            >
+                                <Loader2 className={`w-3 h-3 ${loadingMessages ? 'animate-spin' : ''}`} />
+                                Live Sync
+                            </button>
+                            <button 
+                                className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-all border border-primary/30"
+                            >
+                                {showChats ? 'Close' : 'Open'}
+                            </button>
                         </div>
                     </div>
+
+                    {showChats && (
+                    <div className="glass-panel rounded-[2rem] border border-white/5 overflow-hidden">
+                        {!selectedChatUser ? (
+                            <div className="max-h-[400px] overflow-y-auto divide-y divide-white/5">
+                                {allUsers.length === 0 ? (
+                                    <div className="p-12 text-center text-foreground/30 italic text-sm">No users available on campus.</div>
+                                ) : (
+                                    allUsers.map((user) => (
+                                        <div 
+                                            key={user.id} 
+                                            onClick={() => setSelectedChatUser(user)}
+                                            className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] cursor-pointer transition-colors"
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center font-bold text-primary border border-primary/20 text-lg uppercase">
+                                                    {user.alias?.[0]}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-white text-md uppercase tracking-wider">{user.alias}</span>
+                                                    <span className="text-xs text-foreground/40">{user.real_name}</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-white/5 p-2 rounded-full">
+                                                <ArrowRight className="w-4 h-4 text-foreground/40" />
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-[500px]">
+                                <div className="p-4 border-b border-white/5 flex items-center gap-4 bg-white/5">
+                                    <button 
+                                        onClick={() => setSelectedChatUser(null)}
+                                        className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-[10px] font-black uppercase tracking-widest text-foreground/60 border border-white/10"
+                                    >
+                                        &larr; Back
+                                    </button>
+                                    <div>
+                                        <p className="font-bold text-white flex items-center gap-2">
+                                            Chats for <span className="text-primary">{selectedChatUser.alias}</span>
+                                        </p>
+                                        <p className="text-[10px] text-foreground/40 uppercase tracking-widest">{selectedChatUser.real_name}</p>
+                                    </div>
+                                </div>
+                                <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-black/20">
+                                    {(() => {
+                                        const userMsgs = allMessages.filter(m => {
+                                            const match = m._match;
+                                            const isSender = m.sender_id === selectedChatUser.id;
+                                            const receiverId = match ? (match.user_1_id === m.sender_id ? match.user_2_id : match.user_1_id) : null;
+                                            const isReceiver = receiverId === selectedChatUser.id;
+                                            return isSender || isReceiver;
+                                        }).reverse(); // Show oldest to newest like a chat app
+
+                                        if (userMsgs.length === 0) return <div className="p-12 text-center text-foreground/30 italic text-sm">No recent messages found for this user in the synced window.</div>;
+
+                                        return userMsgs.map(msg => {
+                                            const isSender = msg.sender_id === selectedChatUser.id;
+                                            const match = msg._match;
+                                            const otherId = isSender 
+                                                ? (match ? (match.user_1_id === msg.sender_id ? match.user_2_id : match.user_1_id) : null)
+                                                : msg.sender_id;
+                                            const otherAlias = allUsers.find(u => u.id === otherId)?.alias || "Stranger";
+
+                                            return (
+                                                <div key={msg.id} className={`flex flex-col gap-1 max-w-[85%] ${isSender ? 'ml-auto items-end' : 'mr-auto items-start'}`}>
+                                                    <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest">
+                                                        <span className={isSender ? "text-primary/70" : "text-foreground/40"}>
+                                                            {isSender ? 'To: ' + otherAlias : 'From: ' + otherAlias}
+                                                        </span>
+                                                        <span className="text-foreground/20 font-mono">{new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                    <div className={`p-3.5 shadow-md text-sm leading-relaxed ${isSender ? 'bg-primary/20 text-white rounded-2xl rounded-tr-sm border border-primary/30' : 'bg-white/5 text-foreground/90 rounded-2xl rounded-tl-sm border border-white/10'}`}>
+                                                        {msg.content}
+                                                    </div>
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
