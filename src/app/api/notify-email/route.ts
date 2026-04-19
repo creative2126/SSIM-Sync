@@ -82,7 +82,7 @@ export async function POST(req: Request) {
         });
 
         const info = await transporter.sendMail({
-            from: \`"SSIM Sync" <\${GMAIL_USER}>\`,
+            from: `"SSIM Sync" <${GMAIL_USER}>`,
             to: userEmail,
             subject: "You have a new anonymous message 🔒",
             html: emailHtml
