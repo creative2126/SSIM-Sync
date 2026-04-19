@@ -25,6 +25,7 @@ export default function AdminDashboard() {
     const [loadingMessages, setLoadingMessages] = useState(true);
     const [showVibes, setShowVibes] = useState(false);
     const [showChats, setShowChats] = useState(false);
+    const [showPopulation, setShowPopulation] = useState(false);
     const [selectedChatUser, setSelectedChatUser] = useState<any | null>(null);
 
 
@@ -467,25 +468,33 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="mb-12">
-                    <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={() => setShowPopulation(!showPopulation)}>
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
                                 <Users className="w-5 h-5 text-primary" />
                             </div>
                             <div>
-                                <h2 className="text-xl font-bold text-white">Campus Population</h2>
-                                <p className="text-foreground/40 text-xs">Directory of all active and demo students</p>
+                                <h2 className="text-xl font-bold text-white group-hover:text-primary transition-colors">Campus Population</h2>
+                                <p className="text-foreground/40 text-xs">Click to {showPopulation ? 'hide' : 'view'} directory of all students</p>
                             </div>
                         </div>
-                        <button
-                            onClick={fetchUsers}
-                            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
-                        >
-                            <Loader2 className={`w-3 h-3 ${loadingUsers ? 'animate-spin' : ''}`} />
-                            Sync List
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); fetchUsers(); }}
+                                className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-foreground/50 transition-all font-bold text-[10px] uppercase tracking-widest flex items-center gap-2"
+                            >
+                                <Loader2 className={`w-3 h-3 ${loadingUsers ? 'animate-spin' : ''}`} />
+                                Sync List
+                            </button>
+                            <button 
+                                className="px-4 py-2 rounded-lg bg-primary/20 text-primary text-xs font-bold uppercase tracking-widest hover:bg-primary/30 transition-all border border-primary/30"
+                            >
+                                {showPopulation ? 'Close' : 'Open'}
+                            </button>
+                        </div>
                     </div>
 
+                    {showPopulation && (
                     <div className="glass-panel rounded-[2rem] border border-white/5 overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
@@ -555,6 +564,7 @@ export default function AdminDashboard() {
                             </table>
                         </div>
                     </div>
+                    )}
                 </div>
 
                 <div className="mb-12">
