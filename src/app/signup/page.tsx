@@ -4,7 +4,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, UserCircle2, Loader2, ShieldAlert } from "lucide-react";
+import { ArrowRight, UserCircle2, Loader2, ShieldAlert, GraduationCap } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
 
 export default function SignupPage() {
@@ -12,6 +12,7 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
+    const [detectedCollege, setDetectedCollege] = useState<{ id: string; name: string } | null>(null);
 
     const [formData, setFormData] = useState({
         email: "",
@@ -19,6 +20,29 @@ export default function SignupPage() {
         fullName: "",
         gender: "Male"
     });
+
+    // Live-detect college as user types their email
+    const handleEmailChange = async (value: string) => {
+        setFormData({ ...formData, email: value });
+        setErrorMsg("");
+        setDetectedCollege(null);
+
+        const emailStr = value.trim().toLowerCase();
+        const atIndex = emailStr.lastIndexOf("@");
+        if (atIndex === -1) return;
+
+        const domain = emailStr.slice(atIndex + 1);
+        if (!domain || !domain.includes(".")) return;
+
+        const { data } = await supabase
+            .from("colleges")
+            .select("id, name")
+            .eq("domain", domain)
+            .eq("is_active", true)
+            .maybeSingle();
+
+        if (data) setDetectedCollege(data);
+    };
 
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,15 +52,34 @@ export default function SignupPage() {
 
         const emailStr = formData.email.trim().toLowerCase();
 
-        // 1. Strict Domain Whitelist
-        if (!emailStr.endsWith("@ssim.ac.in")) {
-            setErrorMsg("Access Denied: Only @ssim.ac.in student emails are authorized to join SSIM Sync.");
+        // 1. Parse domain from email
+        const atIndex = emailStr.lastIndexOf("@");
+        if (atIndex === -1) {
+            setErrorMsg("Please enter a valid college email address.");
+            setLoading(false);
+            return;
+        }
+        const domain = emailStr.slice(atIndex + 1);
+
+        // 2. Look up college by domain — must be active
+        const { data: college, error: collegeError } = await supabase
+            .from("colleges")
+            .select("id, name")
+            .eq("domain", domain)
+            .eq("is_active", true)
+            .maybeSingle();
+
+        if (collegeError || !college) {
+            setErrorMsg(
+                `Access Denied: The email domain "@${domain}" is not registered with Sync. ` +
+                `Only approved college emails are authorized.`
+            );
             setLoading(false);
             return;
         }
 
         try {
-            // 2. Core Supabase Auth Sign Up (attaching full_name and gender metadata for delayed creation)
+            // 3. Core Supabase Auth Sign Up (store college_id + metadata for profile creation)
             const { data, error } = await supabase.auth.signUp({
                 email: emailStr,
                 password: formData.password,
@@ -44,7 +87,10 @@ export default function SignupPage() {
                     emailRedirectTo: `${window.location.origin}/onboarding`,
                     data: {
                         full_name: formData.fullName,
-                        gender: formData.gender
+                        gender: formData.gender,
+                        college_id: college.id,
+                        college_name: college.name,
+                        email_domain: domain
                     }
                 }
             });
@@ -52,12 +98,12 @@ export default function SignupPage() {
             if (error) throw error;
 
             if (data.user) {
-
-                // Since Email Confirmation is required, session is usually null.
                 if (!data.session) {
-                    setSuccessMsg("Verification sent! Please check your @ssim.ac.in inbox for the secure link. Your profile will be generated upon login.");
+                    setSuccessMsg(
+                        `Verification sent! Check your @${domain} inbox for the secure link. ` +
+                        `Your profile will be linked to ${college.name} upon login.`
+                    );
                 } else {
-                    // If auto-logged in (email verification is accidentally disabled)
                     router.push("/onboarding");
                 }
             }
@@ -85,9 +131,9 @@ export default function SignupPage() {
                     </div>
                 </div>
 
-                <h1 className="text-3xl font-bold text-center text-foreground mb-2">Join SSIM Sync</h1>
+                <h1 className="text-3xl font-bold text-center text-foreground mb-2">Join Sync</h1>
                 <div className="flex justify-center items-center gap-1 text-emerald-400 text-xs mb-8">
-                    <ShieldAlert className="w-3 h-3" /> <span>SSIM Domain Protected</span>
+                    <ShieldAlert className="w-3 h-3" /> <span>Verified College Emails Only</span>
                 </div>
 
                 {errorMsg && (
@@ -110,11 +156,22 @@ export default function SignupPage() {
                             <input
                                 type="email"
                                 value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                placeholder="student@ssim.ac.in"
+                                onChange={(e) => handleEmailChange(e.target.value)}
+                                placeholder="student@college.edu"
                                 className="px-4 py-3 rounded-xl bg-indigo/50 border border-white/10 text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all placeholder:text-foreground/30"
                                 required
                             />
+                            {/* Live college detection badge */}
+                            {detectedCollege && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: -4 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs"
+                                >
+                                    <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                                    <span>✓ Recognized: <strong>{detectedCollege.name}</strong></span>
+                                </motion.div>
+                            )}
                         </div>
 
                         <div className="flex flex-col gap-2">
@@ -157,7 +214,7 @@ export default function SignupPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="mt-4 w-full py-4 rounded-xl bg-primary text-white font-medium hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(109,93,254,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="mt-4 w-full py-4 rounded-xl btn-gradient font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
                                 <>Sign Up Securely <ArrowRight className="w-4 h-4" /></>

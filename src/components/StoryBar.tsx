@@ -23,6 +23,7 @@ export default function StoryBar() {
     const [newStoryContent, setNewStoryContent] = useState("");
     const [selectedCategory, setSelectedCategory] = useState("Social");
     const [isPosting, setIsPosting] = useState(false);
+    const [myCollegeId, setMyCollegeId] = useState<string | null>(null);
 
     const categories = [
         { name: "Social", icon: "🍹", color: "bg-pink-500" },
@@ -32,6 +33,19 @@ export default function StoryBar() {
     ];
 
     useEffect(() => {
+        // Load current user's college_id for scoping
+        supabase.auth.getUser().then(async ({ data }) => {
+            const uid = data.user?.id;
+            if (uid) {
+                const { data: profile } = await supabase
+                    .from("profiles_public")
+                    .select("college_id")
+                    .eq("id", uid)
+                    .single();
+                setMyCollegeId(profile?.college_id || null);
+            }
+        });
+
         fetchStories();
 
         // Real-time listener for new stories
@@ -52,7 +66,22 @@ export default function StoryBar() {
     }, []);
 
     const fetchStories = async () => {
-        const { data, error } = await supabase
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setLoading(false); return; }
+
+        // Resolve college_id if not yet loaded
+        let collegeId = myCollegeId;
+        if (!collegeId) {
+            const { data: profile } = await supabase
+                .from("profiles_public")
+                .select("college_id")
+                .eq("id", session.user.id)
+                .single();
+            collegeId = profile?.college_id || null;
+            if (collegeId) setMyCollegeId(collegeId);
+        }
+
+        let q = supabase
             .from("stories")
             .select(`
                 *,
@@ -61,6 +90,12 @@ export default function StoryBar() {
             .gt('expires_at', new Date().toISOString())
             .order('created_at', { ascending: false });
 
+        // Scope by college (RLS also enforces this at DB level)
+        if (collegeId) {
+            q = q.eq('college_id', collegeId);
+        }
+
+        const { data, error } = await q;
         if (!error && data) {
             setStories(data as any);
         }
@@ -83,7 +118,8 @@ export default function StoryBar() {
                 user_id: session.user.id,
                 content: newStoryContent,
                 vibe_category: selectedCategory,
-                expires_at: expiresAt.toISOString()
+                expires_at: expiresAt.toISOString(),
+                college_id: myCollegeId  // Explicit; DB trigger also stamps this
             });
 
         if (!error) {

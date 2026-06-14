@@ -14,10 +14,22 @@ export default function DiscoverPage() {
     const [results, setResults] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [myId, setMyId] = useState<string | null>(null);
+    const [myCollegeId, setMyCollegeId] = useState<string | null>(null);
     const [filter, setFilter] = useState<string>("all"); // all, male, female
 
     useEffect(() => {
-        supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id || null));
+        supabase.auth.getUser().then(async ({ data }) => {
+            const uid = data.user?.id || null;
+            setMyId(uid);
+            if (uid) {
+                const { data: profile } = await supabase
+                    .from("profiles_public")
+                    .select("college_id")
+                    .eq("id", uid)
+                    .single();
+                setMyCollegeId(profile?.college_id || null);
+            }
+        });
         // Load some initial "New Faces"
         handleSearch("");
     }, []);
@@ -31,6 +43,11 @@ export default function DiscoverPage() {
                 .neq("id", myId || "") // Don't find yourself
                 .order("created_at", { ascending: false })
                 .limit(20);
+
+            // Scope by college — only show students from same college
+            if (myCollegeId) {
+                q = q.eq("college_id", myCollegeId);
+            }
 
             if (query.trim()) {
                 q = q.ilike("alias", `%${query}%`);
@@ -54,7 +71,7 @@ export default function DiscoverPage() {
             handleSearch(searchQuery);
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery, filter]);
+    }, [searchQuery, filter, myCollegeId]);
 
     const connectWithUser = async (targetUserId: string) => {
         if (!myId) return router.push("/login");
@@ -72,7 +89,8 @@ export default function DiscoverPage() {
             const { error } = await supabase.from("matches").insert({
                 user_1_id: myId,
                 user_2_id: targetUserId,
-                is_revealed: false
+                is_revealed: false,
+                college_id: myCollegeId  // Explicit; DB trigger is primary enforcement
             });
 
             if (error) alert("Error connecting. Try again.");

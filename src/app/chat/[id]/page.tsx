@@ -162,6 +162,21 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
         const { data: me } = await supabase.from("profiles_public").select("*").eq("id", currentSession.user.id).single();
         setMyProfile(me);
 
+        // ── College Isolation Check ──────────────────────────────────────────
+        // Fetch the other user's profile to compare college_id before proceeding.
+        // The DB trigger already blocks cross-college match creation, but a user
+        // could craft a direct URL to /chat/[id]. We catch that here.
+        const { data: other } = await supabase.from("profiles_public").select("*").eq("id", id).single();
+
+        if (me && other && me.college_id && other.college_id && me.college_id !== other.college_id) {
+            console.warn("Cross-college chat attempt blocked.");
+            router.push("/matches");
+            return null;
+        }
+
+        setOtherProfile(other);
+        setLastSeen(other?.last_seen);
+
         const { data: currentMatch } = await supabase
             .from("matches")
             .select("*")
@@ -173,11 +188,6 @@ export default function ChatPage({ params }: { params: Promise<{ id: string }> }
             return null;
         }
         setMatchData(currentMatch);
-
-        // Fetch other profile (if fully revealed, we might want to fetch real photo later)
-        const { data: other } = await supabase.from("profiles_public").select("*").eq("id", id).single();
-        setOtherProfile(other);
-        setLastSeen(other?.last_seen);
 
         const { data: previousMsgs } = await supabase
             .from("messages")

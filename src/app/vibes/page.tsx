@@ -118,7 +118,9 @@ export default function VibesPage() {
                 ];
             }
 
-            // 2. Fetch vibes (filtered if someone is logged in)
+            // 2. Fetch vibes filtered by current user's college
+            const myCollegeId = myProfile?.college_id || null;
+
             let query = supabase
                 .from("vibes")
                 .select(`
@@ -131,6 +133,11 @@ export default function VibesPage() {
                     vibe_likes (count)
                 `)
                 .order("created_at", { ascending: false });
+
+            // Scope to same college (RLS also enforces this at DB level)
+            if (myCollegeId) {
+                query = query.eq("college_id", myCollegeId);
+            }
 
             if (excludedIds.length > 0) {
                 query = query.not("user_id", "in", `(${excludedIds.join(",")})`);
@@ -180,7 +187,8 @@ export default function VibesPage() {
         setIsSharing(true);
         const { error } = await supabase.from("vibes").insert({
             user_id: session.user.id,
-            content: newVibe
+            content: newVibe,
+            college_id: myProfile?.college_id || null  // Explicit; DB trigger also stamps this
         });
 
         if (error) {
@@ -371,7 +379,7 @@ export default function VibesPage() {
                         <button
                             onClick={handleShareVibe}
                             disabled={isSharing || !newVibe.trim()}
-                            className="px-8 py-3 bg-primary text-white rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
+                            className="px-8 py-3 btn-gradient rounded-2xl font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2"
                         >
                             {isSharing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Share Vibe"}
                         </button>
@@ -386,30 +394,30 @@ export default function VibesPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.05 }}
-                            className="glass-panel p-6 rounded-3xl border border-white/5 hover:border-white/10 transition-all group"
+                            className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-3xl transition-all group relative overflow-hidden shadow-2xl"
                         >
-                            <div className="flex justify-between items-start mb-4">
+                            <p className="text-foreground/90 text-2xl leading-relaxed mb-8 font-bold italic">
+                                "{vibe.content}"
+                            </p>
+
+                            <div className="flex justify-between items-end mb-6">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo/30 flex items-center justify-center text-primary border border-white/5">
-                                        <Zap className="w-6 h-6" />
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${vibe.profiles_public?.gender === 'Female' ? 'bg-gradient-to-br from-[#FF2A6D] to-rose-400 shadow-[0_0_15px_rgba(255,42,109,0.5)]' : 'bg-gradient-to-br from-[#9B00E8] to-cyan-400 shadow-[0_0_15px_rgba(155,0,232,0.5)]'}`}>
+                                        <Zap className="w-4 h-4 text-white" />
                                     </div>
                                     <div>
                                         <div className="flex items-center gap-2">
-                                            <h3 className="font-bold text-white text-base">{vibe.profiles_public?.alias}</h3>
+                                            <h3 className="font-bold text-white/70 text-sm">{vibe.profiles_public?.alias}</h3>
                                             {vibe.profiles_public?.verification_status === 'verified' && (
-                                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                                <ShieldCheck className="w-3 h-3 text-emerald-400" />
                                             )}
                                         </div>
-                                        <p className="text-[10px] text-foreground/30 uppercase tracking-[0.2em] font-bold mt-0.5">
+                                        <p className="text-[10px] text-foreground/30 uppercase tracking-widest font-bold mt-0.5">
                                             {vibe.profiles_public?.gender} • {new Date(vibe.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                         </p>
                                     </div>
                                 </div>
                             </div>
-
-                            <p className="text-foreground/80 text-lg leading-relaxed mb-8 font-medium italic">
-                                "{vibe.content}"
-                            </p>
 
                             <div className="flex items-center gap-2">
                                 <button
@@ -439,7 +447,7 @@ export default function VibesPage() {
                                 </button>
                                 <button
                                     onClick={() => connectWithUser(vibe.user_id)}
-                                    className="flex-1 py-3.5 rounded-2xl bg-primary text-white font-bold text-xs shadow-lg shadow-primary/20 transition-all active:scale-95 flex items-center justify-center gap-2"
+                                    className="flex-1 py-3.5 rounded-2xl btn-gradient font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-2"
                                 >
                                     Connect
                                 </button>
@@ -593,7 +601,7 @@ export default function VibesPage() {
                                     setShowProfileModal(false);
                                     connectWithUser(selectedProfile?.id);
                                 }}
-                                className="w-full py-4 bg-primary text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-primary/20"
+                                className="w-full py-4 btn-gradient rounded-2xl font-bold flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all"
                             >
                                 <MessageSquare className="w-5 h-5" />
                                 Initiate Vibe

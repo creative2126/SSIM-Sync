@@ -63,11 +63,30 @@ export default function OnboardingPage() {
             if (!checkData || checkData.length === 0) {
                 const meta = user.user_metadata || {};
 
+                // ── Resolve college_id ──────────────────────────────────────
+                // Priority 1: stored in auth metadata during signup
+                let collegeId: string | null = meta.college_id || null;
+
+                // Priority 2: parse email domain (fallback for legacy / SSO users)
+                if (!collegeId && user.email) {
+                    const domain = user.email.split("@").pop()?.toLowerCase();
+                    if (domain) {
+                        const { data: college } = await supabase
+                            .from("colleges")
+                            .select("id")
+                            .eq("domain", domain)
+                            .eq("is_active", true)
+                            .maybeSingle();
+                        collegeId = college?.id || null;
+                    }
+                }
+
                 await supabase.from("profiles_private").insert({
                     id: user.id,
                     real_name: meta.full_name || "Student",
                     email: user.email,
-                    verification_status: "pending"
+                    verification_status: "pending",
+                    college_id: collegeId
                 });
 
                 const tempAlias = `User_${Math.floor(Math.random() * 100000)}`;
@@ -75,7 +94,8 @@ export default function OnboardingPage() {
                     id: user.id,
                     alias: tempAlias,
                     real_name: meta.full_name || "Student",
-                    gender: meta.gender || "Male"
+                    gender: meta.gender || "Male",
+                    college_id: collegeId
                 });
             } else {
                 const { data: pubProfile } = await supabase.from("profiles_public").select("alias, bio").eq("id", user.id).single();
@@ -223,12 +243,12 @@ export default function OnboardingPage() {
                                 {VIBE_QUESTIONS.map(q => (
                                     <div key={q.id}>
                                         <p className="font-medium text-foreground/90 mb-3">{q.question}</p>
-                                        <div className="grid grid-cols-2 gap-3">
+                                        <div className="flex flex-wrap gap-3">
                                             {q.options.map(opt => (
                                                 <button
                                                     key={opt}
                                                     onClick={() => setVibeAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                                                    className={`p-3 rounded-xl text-sm font-medium transition-all text-left ${vibeAnswers[q.id] === opt ? "bg-primary/20 border-primary text-primary border" : "bg-indigo/30 border border-white/5 hover:bg-indigo/50 text-foreground/70"}`}
+                                                    className={`px-6 py-2 rounded-full text-sm font-medium transition-all text-left border ${vibeAnswers[q.id] === opt ? "btn-gradient border-transparent" : "bg-indigo/30 border-white/5 hover:bg-indigo/50 text-foreground/70"}`}
                                                 >
                                                     {opt}
                                                 </button>
@@ -365,7 +385,7 @@ export default function OnboardingPage() {
                         <button
                             onClick={handleNext}
                             disabled={step === 1 && Object.keys(vibeAnswers).length < 4}
-                            className="px-6 py-3 rounded-xl bg-primary hover:bg-primary/90 transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_15px_rgba(109,93,254,0.2)]"
+                            className="px-6 py-3 rounded-xl btn-gradient transition-all font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Next Step <ArrowRight className="w-4 h-4" />
                         </button>

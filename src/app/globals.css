@@ -1,11 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --color-midnight: #0B0E14;
-  --color-primary: #6D5DFE;
+  --color-midnight: #0D0E12;
+  --color-primary: #FF2A6D; /* fallback primary */
   --color-indigo: #4F46E5;
+  --color-electric-pink: #FF2A6D;
+  --color-neon-violet: #9B00E8;
 
-  --shadow-primary: 0 0 30px rgba(109, 93, 254, 0.3);
+  --shadow-primary: 0 0 30px rgba(255, 42, 109, 0.3);
 }
 
 @layer base {
@@ -32,13 +34,17 @@
 
 /* Fallback utilities for complex combinations */
 .bg-midnight {
-  background-color: #0B0E14;
+  background-color: #0D0E12;
 }
 
 .text-primary {
-  color: #6D5DFE;
+  color: #FF2A6D;
 }
 
 .bg-primary {
-  background-color: #6D5DFE;
+  background-color: #FF2A6D;
+}
+
+.btn-gradient {
+  @apply bg-gradient-to-r from-[#FF2A6D] to-[#9B00E8] text-white shadow-lg shadow-[#FF2A6D]/20;
 }

@@ -109,6 +109,7 @@ export default function FeedPage() {
                 .from("profiles_public")
                 .select("id, alias, gender, verification_status, vibe_scores, bio")
                 .eq("gender", targetGender)
+                .eq("college_id", myProfile.college_id)
                 .not("id", "in", `(${Array.from(excludedIds).join(",")})`);
 
             if (potentialMatches) {
@@ -142,6 +143,7 @@ export default function FeedPage() {
             .from("profiles_public")
             .select("id, alias, gender, verification_status, vibe_scores, bio")
             .neq("id", currentUser?.id || "")
+            .eq("college_id", currentUser?.college_id || "")
             .ilike("alias", `%${val}%`)
             .limit(10);
 
@@ -424,16 +426,35 @@ export default function FeedPage() {
                                 </div>
                             </motion.div>
                         ) : (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center text-foreground/50 text-center px-12">
-                                <motion.div
-                                    animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
-                                    transition={{ duration: 3, repeat: Infinity }}
-                                    className="w-24 h-24 rounded-full bg-primary/5 border border-primary/20 flex items-center justify-center mb-6"
-                                >
-                                    <Loader2 className="w-10 h-10 text-primary animate-spin" />
-                                </motion.div>
-                                <h2 className="text-xl font-bold text-white mb-2">Scanning Campus</h2>
-                                <p className="text-sm leading-relaxed">No more profiles in your vibe-sphere right now. Check back soon for new students!</p>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-foreground/50 text-center px-12 overflow-hidden">
+                                <div className="relative flex items-center justify-center w-64 h-64 mb-8">
+                                    {/* Pulsing Radar Waves */}
+                                    <motion.div
+                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
+                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
+                                        className="absolute inset-0 rounded-full border border-[#FF2A6D]"
+                                    />
+                                    <motion.div
+                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
+                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 0.8 }}
+                                        className="absolute inset-0 rounded-full border border-[#9B00E8]"
+                                    />
+                                    <motion.div
+                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
+                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 1.6 }}
+                                        className="absolute inset-0 rounded-full border border-[#FF2A6D]"
+                                    />
+                                    
+                                    {/* Center Clock */}
+                                    <div className="relative z-10 w-32 h-32 rounded-full glass-panel flex flex-col items-center justify-center border-white/10 shadow-[0_0_40px_rgba(255,42,109,0.3)]">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 mb-1">Next Wave</p>
+                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A6D] to-[#9B00E8]">
+                                            {timeLeft || "0h 0m 0s"}
+                                        </p>
+                                    </div>
+                                </div>
+                                <h2 className="text-2xl font-bold text-white mb-3">Scanning Campus</h2>
+                                <p className="text-sm leading-relaxed max-w-xs mx-auto">No more profiles in your vibe-sphere right now. The next wave of students arrives soon!</p>
                             </div>
                         )}
                     </AnimatePresence>
@@ -451,7 +472,7 @@ export default function FeedPage() {
                     <button
                         onClick={() => handleAction("like")}
                         disabled={currentIndex >= profiles.length || initiationsToday >= 3}
-                        className={`w-18 h-18 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:grayscale ${initiationsToday >= 3 ? "bg-white/10 text-foreground/20" : "bg-primary text-white shadow-[0_0_30px_rgba(109,93,254,0.4)]"}`}
+                        className={`w-18 h-18 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:grayscale ${initiationsToday >= 3 ? "bg-white/10 text-foreground/20" : "btn-gradient"}`}
                     >
                         <Heart className="w-9 h-9 fill-current" />
                     </button>
@@ -477,7 +498,7 @@ export default function FeedPage() {
                         <div className="w-full flex flex-col gap-3">
                             <button
                                 onClick={() => router.push(`/chat/${matchModal.id}`)}
-                                className="w-full py-5 rounded-2xl bg-primary text-white font-bold hover:bg-primary/90 transition-all shadow-[0_0_20px_rgba(109,93,254,0.4)] flex items-center justify-center gap-2"
+                                className="w-full py-5 rounded-2xl btn-gradient font-bold hover:scale-[1.02] transition-all flex items-center justify-center gap-2"
                             >
                                 Enter Private Chat
                             </button>
@@ -548,7 +569,7 @@ export default function FeedPage() {
                                     <button onClick={() => { setShowProfileModal(false); skipProfile(); }} className="w-full py-4 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-bold uppercase tracking-widest text-foreground/50 hover:bg-white/10 transition-colors">
                                         Skip Quietly
                                     </button>
-                                    <button onClick={() => { setShowProfileModal(false); handleMatch(profiles[currentIndex].id); }} className="w-full py-4 bg-primary text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-105 transition-transform">
+                                    <button onClick={() => { setShowProfileModal(false); handleMatch(profiles[currentIndex].id); }} className="w-full py-4 btn-gradient rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-transform">
                                         Match & Chat 🔥
                                     </button>
                                 </div>
