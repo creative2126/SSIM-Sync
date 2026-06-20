@@ -394,7 +394,8 @@ export default function VibesPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: idx * 0.05 }}
-                            className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-3xl transition-all group relative overflow-hidden shadow-2xl"
+                            onDoubleClick={() => connectWithUser(vibe.user_id)}
+                            className="bg-white/[0.02] backdrop-blur-xl p-6 rounded-3xl transition-all group relative overflow-hidden shadow-2xl select-none"
                         >
                             <p className="text-foreground/90 text-2xl leading-relaxed mb-8 font-bold italic">
                                 "{vibe.content}"
@@ -444,12 +445,6 @@ export default function VibesPage() {
                                 >
                                     <MessageSquare className="w-3.5 h-3.5" />
                                     {vibe.vibe_comments?.[0]?.count || 0}
-                                </button>
-                                <button
-                                    onClick={() => connectWithUser(vibe.user_id)}
-                                    className="flex-1 py-3.5 rounded-2xl btn-gradient font-bold text-xs transition-all active:scale-95 flex items-center justify-center gap-2"
-                                >
-                                    Connect
                                 </button>
                             </div>
 

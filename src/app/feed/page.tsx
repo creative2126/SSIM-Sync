@@ -16,52 +16,13 @@ export default function FeedPage() {
     const [matchModal, setMatchModal] = useState<any>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [selectedProfileStories, setSelectedProfileStories] = useState<any[]>([]);
-    const [initiationsToday, setInitiationsToday] = useState(0);
-    const [timeLeft, setTimeLeft] = useState("");
+    const [selectedProfileStories, setSelectedProfileStories] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     useEffect(() => {
         fetchFeed();
-        fetchInteractionCount();
-
-        const timer = setInterval(() => {
-            updateCountdown();
-        }, 1000);
-
-        return () => clearInterval(timer);
     }, []);
-
-    const updateCountdown = () => {
-        const now = new Date();
-        const nextHour = (Math.floor(now.getHours() / 6) + 1) * 6;
-        const nextRefill = new Date(now).setHours(nextHour, 0, 0, 0);
-        const diff = nextRefill - now.getTime();
-
-        const h = Math.floor(diff / 3600000);
-        const m = Math.floor((diff % 3600000) / 60000);
-        const s = Math.floor((diff % 60000) / 1000);
-
-        setTimeLeft(`${h}h ${m}m ${s}s`);
-        if (diff <= 1000) fetchInteractionCount();
-    };
-
-    const fetchInteractionCount = async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const now = new Date();
-        const windowStartHour = Math.floor(now.getHours() / 6) * 6;
-        const windowStart = new Date(now).setHours(windowStartHour, 0, 0, 0);
-
-        const { count } = await supabase
-            .from("matches")
-            .select("*", { count: "exact", head: true })
-            .eq("user_1_id", session.user.id)
-            .gte("created_at", new Date(windowStart).toISOString());
-
-        setInitiationsToday(count || 0);
-    };
 
     const fetchFeed = async () => {
         setLoading(true);
@@ -182,11 +143,6 @@ export default function FeedPage() {
         const targetProfile = profiles[currentIndex];
 
         if (action === "like") {
-            if (initiationsToday >= 3) {
-                alert("Daily limit reached! You can initiate 3 anonymous chats per day.");
-                return;
-            }
-
             const { error } = await supabase
                 .from("matches")
                 .insert({
@@ -197,7 +153,6 @@ export default function FeedPage() {
 
             if (!error) {
                 setMatchModal(targetProfile);
-                setInitiationsToday(prev => prev + 1);
             }
         } else if (action === "pass") {
             // Persistent rejection
@@ -223,16 +178,6 @@ export default function FeedPage() {
                 <header className="flex flex-col gap-4 mb-6">
                     <div className="flex justify-between items-center">
                         <h1 className="text-xl font-bold tracking-tight">Discover</h1>
-                        <div className="flex flex-col items-end">
-                            <div className="flex gap-1">
-                                {[1, 2, 3].map(i => (
-                                    <div key={i} className={`w-2 h-2 rounded-full ${i <= (3 - initiationsToday) ? "bg-primary shadow-[0_0_8px_rgba(109,93,254,0.6)]" : "bg-white/10"}`} />
-                                ))}
-                            </div>
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-foreground/30 mt-1">
-                                {3 - initiationsToday} vibes left • Refill in {timeLeft}
-                            </span>
-                        </div>
                     </div>
 
                     {/* Search Bar */}
@@ -427,34 +372,19 @@ export default function FeedPage() {
                             </motion.div>
                         ) : (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-foreground/50 text-center px-12 overflow-hidden">
-                                <div className="relative flex items-center justify-center w-64 h-64 mb-8">
-                                    {/* Pulsing Radar Waves */}
-                                    <motion.div
-                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
-                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut" }}
-                                        className="absolute inset-0 rounded-full border border-[#FF2A6D]"
-                                    />
-                                    <motion.div
-                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
-                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 0.8 }}
-                                        className="absolute inset-0 rounded-full border border-[#9B00E8]"
-                                    />
-                                    <motion.div
-                                        animate={{ scale: [1, 2.5], opacity: [0.8, 0] }}
-                                        transition={{ duration: 2.5, repeat: Infinity, ease: "easeOut", delay: 1.6 }}
-                                        className="absolute inset-0 rounded-full border border-[#FF2A6D]"
-                                    />
-                                    
-                                    {/* Center Clock */}
-                                    <div className="relative z-10 w-32 h-32 rounded-full glass-panel flex flex-col items-center justify-center border-white/10 shadow-[0_0_40px_rgba(255,42,109,0.3)]">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-foreground/40 mb-1">Next Wave</p>
-                                        <p className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#FF2A6D] to-[#9B00E8]">
-                                            {timeLeft || "0h 0m 0s"}
-                                        </p>
-                                    </div>
+                                <div className="relative flex items-center justify-center w-32 h-32 mb-8 rounded-full bg-white/5 border border-white/10 shadow-2xl">
+                                    <Search className="w-12 h-12 text-primary" />
                                 </div>
-                                <h2 className="text-2xl font-bold text-white mb-3">Scanning Campus</h2>
-                                <p className="text-sm leading-relaxed max-w-xs mx-auto">No more profiles in your vibe-sphere right now. The next wave of students arrives soon!</p>
+                                <h2 className="text-2xl font-bold text-white mb-3">You've seen everyone!</h2>
+                                <p className="text-sm leading-relaxed max-w-xs mx-auto text-foreground/70">
+                                    You've seen everyone on campus for now! Drop a new anonymous confession on the Vibes feed to catch someone's attention.
+                                </p>
+                                <button
+                                    onClick={() => router.push("/vibes")}
+                                    className="mt-8 px-6 py-3 rounded-xl btn-gradient font-bold transition-all hover:scale-105 active:scale-95 text-white"
+                                >
+                                    Go to Vibes Feed
+                                </button>
                             </div>
                         )}
                     </AnimatePresence>
@@ -471,8 +401,8 @@ export default function FeedPage() {
 
                     <button
                         onClick={() => handleAction("like")}
-                        disabled={currentIndex >= profiles.length || initiationsToday >= 3}
-                        className={`w-18 h-18 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:grayscale ${initiationsToday >= 3 ? "bg-white/10 text-foreground/20" : "btn-gradient"}`}
+                        disabled={currentIndex >= profiles.length}
+                        className="w-18 h-18 rounded-full flex items-center justify-center transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:grayscale btn-gradient"
                     >
                         <Heart className="w-9 h-9 fill-current" />
                     </button>

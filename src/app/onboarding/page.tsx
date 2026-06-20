@@ -3,32 +3,23 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ArrowLeft, UploadCloud, CheckCircle2, Loader2, ShieldAlert, Camera } from "lucide-react";
+import { ArrowRight, ArrowLeft, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase/client";
-import CameraCapture from "@/components/CameraCapture";
 
-const VIBE_QUESTIONS = [
-    {
-        id: "q1",
-        question: "Your ideal connection starts with:",
-        options: ["Deep conversation", "Random banter", "Comfort", "Shared humor"]
-    },
-    {
-        id: "q2",
-        question: "Your vibe is more:",
-        options: ["Calm", "Chaotic", "Thoughtful", "Playful"]
-    },
-    {
-        id: "q3",
-        question: "You’re more likely to fall for:",
-        options: ["Kindness", "Intelligence", "Confidence", "Humor"]
-    },
-    {
-        id: "q4",
-        question: "Best hangout?",
-        options: ["Coffee", "Long walk", "Movie night", "Random spontaneous plan"]
-    }
+const VIBE_OPTIONS = [
+    "Deep conversation", "Random banter", "Comfort", "Shared humor",
+    "Calm", "Chaotic", "Thoughtful", "Playful",
+    "Kindness", "Intelligence", "Confidence", "Sarcasm",
+    "Coffee", "Long walk", "Movie night", "Spontaneous"
 ];
+
+const generateCampusAlias = () => {
+    const adjectives = ["Canteen", "Library", "Midnight", "Coffee", "Hostel", "Campus", "Exam", "Lecture", "Silent", "Sleepy"];
+    const nouns = ["Philosopher", "Sleeper", "Thinker", "Addict", "Ghost", "Wanderer", "Procrastinator", "Genius", "Ninja", "Overthinker"];
+    const randomAdjective = adjectives[Math.floor(Math.random() * adjectives.length)];
+    const randomNoun = nouns[Math.floor(Math.random() * nouns.length)];
+    return `${randomAdjective}${randomNoun}${Math.floor(Math.random() * 100)}`;
+};
 
 export default function OnboardingPage() {
     const router = useRouter();
@@ -37,13 +28,10 @@ export default function OnboardingPage() {
     const [session, setSession] = useState<any>(null);
 
     // Form State
-    const [vibeAnswers, setVibeAnswers] = useState<Record<string, string>>({});
+    const [vibeAnswers, setVibeAnswers] = useState<string[]>([]);
     const [alias, setAlias] = useState("");
     const [aliasError, setAliasError] = useState<string | null>(null);
     const [bio, setBio] = useState("");
-    const [studentIdFile, setStudentIdFile] = useState<File | null>(null);
-    const [selfieFile, setSelfieFile] = useState<File | null>(null);
-    const [activeCamera, setActiveCamera] = useState<"id" | "selfie" | null>(null);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data }) => {
@@ -64,10 +52,8 @@ export default function OnboardingPage() {
                 const meta = user.user_metadata || {};
 
                 // ── Resolve college_id ──────────────────────────────────────
-                // Priority 1: stored in auth metadata during signup
                 let collegeId: string | null = meta.college_id || null;
 
-                // Priority 2: parse email domain (fallback for legacy / SSO users)
                 if (!collegeId && user.email) {
                     const domain = user.email.split("@").pop()?.toLowerCase();
                     if (domain) {
@@ -85,11 +71,11 @@ export default function OnboardingPage() {
                     id: user.id,
                     real_name: meta.full_name || "Student",
                     email: user.email,
-                    verification_status: "pending",
+                    verification_status: "approved", // Automatically approved since email is verified
                     college_id: collegeId
                 });
 
-                const tempAlias = `User_${Math.floor(Math.random() * 100000)}`;
+                const tempAlias = generateCampusAlias();
                 await supabase.from("profiles_public").insert({
                     id: user.id,
                     alias: tempAlias,
@@ -110,75 +96,37 @@ export default function OnboardingPage() {
     };
 
     const handleNext = async () => {
-        if (step === 2) {
-            setLoading(true);
-            setAliasError(null);
-
-            setLoading(false);
-        }
-        setStep(s => Math.min(s + 1, 3));
+        setStep(s => Math.min(s + 1, 2));
     };
+
     const handleBack = () => {
         setAliasError(null);
         setStep(s => Math.max(s - 1, 1));
     };
 
     const handleFinish = async () => {
-        if (!session?.user || !selfieFile || !studentIdFile) return;
+        if (!session?.user) return;
         setLoading(true);
 
         try {
-            const faceapi = await import("face-api.js");
-            await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-
-            const selfieUrl = URL.createObjectURL(selfieFile);
-            const selfieImg = new Image();
-            selfieImg.src = selfieUrl;
-            await new Promise((resolve) => { selfieImg.onload = resolve; });
-
-            const detections = await faceapi.detectAllFaces(selfieImg, new faceapi.TinyFaceDetectorOptions());
-
-            if (detections.length === 0) {
-                alert("No face detected in the selfie. Please upload a clear photo of your face.");
-                throw new Error("No face detected");
-            }
-            if (detections.length > 1) {
-                alert("Multiple faces detected. Please ensure only you are in the photo.");
-                throw new Error("Multiple faces detected");
-            }
-
-            const selfiePath = `selfies/${session.user.id}_${Date.now()}.jpg`;
-            const idPath = `ids/${session.user.id}_${Date.now()}.jpg`;
-
-            const { error: selfieUploadError } = await supabase.storage.from("verifications").upload(selfiePath, selfieFile);
-            if (selfieUploadError) {
-                console.error("Selfie upload error:", selfieUploadError);
-                throw new Error(`Selfie upload failed: ${selfieUploadError.message}. Ensure the 'verifications' bucket exists in Supabase Storage.`);
-            }
-
-            const { error: idUploadError } = await supabase.storage.from("verifications").upload(idPath, studentIdFile);
-            if (idUploadError) {
-                console.error("ID upload error:", idUploadError);
-                throw new Error(`ID upload failed: ${idUploadError.message}. Ensure the 'verifications' bucket exists in Supabase Storage.`);
-            }
-
+            const finalAlias = alias || generateCampusAlias();
+            
             const { error: publicErr } = await supabase
                 .from("profiles_public")
                 .update({
-                    alias: alias || `User_${Math.floor(Math.random() * 9999)}`,
+                    alias: finalAlias,
                     bio: bio,
-                    vibe_scores: vibeAnswers
+                    vibe_scores: { selections: vibeAnswers }
                 })
                 .eq("id", session.user.id);
 
             if (publicErr) throw publicErr;
 
+            // Mark as approved immediately since domain handles verification
             const { error: privateErr } = await supabase
                 .from("profiles_private")
                 .update({
-                    student_id_url: idPath,
-                    selfie_url: selfiePath,
-                    verification_status: "pending"
+                    verification_status: "approved"
                 })
                 .eq("id", session.user.id);
 
@@ -187,11 +135,17 @@ export default function OnboardingPage() {
             router.push("/feed");
         } catch (err: any) {
             console.error(err);
-            if (!err.message.includes("face")) {
-                alert("Error setting up profile. Please ensure caching is not blocking the DB query.");
-            }
+            alert("Error setting up profile.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const toggleVibe = (opt: string) => {
+        if (vibeAnswers.includes(opt)) {
+            setVibeAnswers(vibeAnswers.filter(v => v !== opt));
+        } else if (vibeAnswers.length < 5) {
+            setVibeAnswers([...vibeAnswers, opt]);
         }
     };
 
@@ -217,15 +171,15 @@ export default function OnboardingPage() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                    {[1, 2, 3].map(num => (
+                    {[1, 2].map(num => (
                         <div key={num} className="flex flex-col items-center gap-2 flex-1 relative">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-all ${step >= num ? "bg-primary text-white shadow-[0_0_15px_rgba(109,93,254,0.4)]" : "bg-indigo/30 text-foreground/40 border border-white/5"}`}>
                                 {step > num ? <CheckCircle2 className="w-5 h-5" /> : num}
                             </div>
                             <span className={`text-[10px] font-black uppercase tracking-tighter mt-1 ${step >= num ? "text-primary" : "text-foreground/40"}`}>
-                                {num === 1 ? "Vibe" : num === 2 ? "Profile" : "Safety"}
+                                {num === 1 ? "Vibe" : "Profile"}
                             </span>
-                            {num !== 3 && (
+                            {num !== 2 && (
                                 <div className={`absolute top-5 left-1/2 w-full h-[2px] -z-10 ${step > num ? "bg-primary/50" : "bg-white/5"}`} />
                             )}
                         </div>
@@ -238,24 +192,22 @@ export default function OnboardingPage() {
                     {/* STEP 1: VIBE QUESTIONS */}
                     {step === 1 && (
                         <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-panel p-8 md:p-10 rounded-3xl">
-                            <h2 className="text-2xl font-bold mb-6">Let's find your vibe.</h2>
-                            <div className="flex flex-col gap-8">
-                                {VIBE_QUESTIONS.map(q => (
-                                    <div key={q.id}>
-                                        <p className="font-medium text-foreground/90 mb-3">{q.question}</p>
-                                        <div className="flex flex-wrap gap-3">
-                                            {q.options.map(opt => (
-                                                <button
-                                                    key={opt}
-                                                    onClick={() => setVibeAnswers(prev => ({ ...prev, [q.id]: opt }))}
-                                                    className={`px-6 py-2 rounded-full text-sm font-medium transition-all text-left border ${vibeAnswers[q.id] === opt ? "btn-gradient border-transparent" : "bg-indigo/30 border-white/5 hover:bg-indigo/50 text-foreground/70"}`}
-                                                >
-                                                    {opt}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                ))}
+                            <h2 className="text-2xl font-bold mb-2">Let's find your vibe.</h2>
+                            <p className="text-foreground/50 text-sm mb-6">Pick 3 to 5 traits that describe you best.</p>
+                            
+                            <div className="flex flex-wrap gap-3">
+                                {VIBE_OPTIONS.map(opt => {
+                                    const isSelected = vibeAnswers.includes(opt);
+                                    return (
+                                        <button
+                                            key={opt}
+                                            onClick={() => toggleVibe(opt)}
+                                            className={`px-6 py-2 rounded-full text-sm font-medium transition-all text-left border ${isSelected ? "btn-gradient border-transparent" : "bg-indigo/30 border-white/5 hover:bg-indigo/50 text-foreground/70"}`}
+                                        >
+                                            {opt}
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </motion.div>
                     )}
@@ -276,7 +228,7 @@ export default function OnboardingPage() {
                                             setAlias(e.target.value);
                                             setAliasError(null);
                                         }}
-                                        placeholder="e.g. MidnightThinker"
+                                        placeholder="e.g. MidnightThinker (Leave blank for random)"
                                         className={`px-4 py-3 rounded-xl bg-indigo/50 border ${aliasError ? "border-red-500/50" : "border-white/10"} text-foreground focus:outline-none focus:border-primary/50`}
                                     />
                                     {aliasError ? (
@@ -299,78 +251,6 @@ export default function OnboardingPage() {
                             </div>
                         </motion.div>
                     )}
-
-                    {/* STEP 3: VERIFICATION */}
-                    {step === 3 && (
-                        <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-panel p-8 md:p-10 rounded-3xl">
-                            <h2 className="text-2xl font-bold mb-2">Platform Verification</h2>
-                            <p className="text-foreground/50 text-sm mb-6">Your identity remains hidden. Used strictly for manual approval to keep the platform safe.</p>
-
-                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl flex gap-3 mb-8">
-                                <ShieldAlert className="text-amber-500 w-6 h-6 shrink-0" />
-                                <p className="text-xs text-amber-200 leading-relaxed">Identity verification protects our community from fake accounts. Your pictures will be securely stored and never shown publicly without your explicit consent via Mutual Reveal.</p>
-                            </div>
-
-                            <div className="flex flex-col gap-8">
-                                {/* Student ID Section */}
-                                <div className="flex flex-col gap-3">
-                                    <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
-                                        SSIM Student ID
-                                        {studentIdFile && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                                    </label>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <label className="border-2 border-dashed border-white/10 hover:border-primary/50 transition-colors rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer bg-indigo/20 group">
-                                            <UploadCloud className="w-6 h-6 text-primary/50 group-hover:text-primary mb-2" />
-                                            <p className="text-xs font-medium">Upload ID</p>
-                                            <input type="file" accept="image/*" className="hidden" onChange={(e) => setStudentIdFile(e.target.files?.[0] || null)} />
-                                        </label>
-                                        <button
-                                            onClick={() => setActiveCamera("id")}
-                                            className="border-2 border-dashed border-white/10 hover:border-primary/50 transition-colors rounded-2xl p-4 flex flex-col items-center justify-center text-center cursor-pointer bg-indigo/20 group"
-                                        >
-                                            <Camera className="w-6 h-6 text-primary/50 group-hover:text-primary mb-2" />
-                                            <p className="text-xs font-medium">Take Photo</p>
-                                        </button>
-                                    </div>
-                                    {studentIdFile && (
-                                        <div className="mt-2 flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-indigo/30">
-                                                <img src={URL.createObjectURL(studentIdFile)} alt="ID Preview" className="w-full h-full object-cover" />
-                                            </div>
-                                            <p className="text-xs text-foreground/50 truncate flex-1">{studentIdFile.name}</p>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Selfie Section (CAMERA ONLY) */}
-                                <div className="flex flex-col gap-3">
-                                    <label className="text-sm font-medium text-foreground/80 flex items-center gap-2">
-                                        Verification Selfie (Live Photo Required)
-                                        {selfieFile && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                                    </label>
-                                    <div className="w-full">
-                                        <button
-                                            onClick={() => setActiveCamera("selfie")}
-                                            className="w-full border-2 border-dashed border-white/10 hover:border-primary/50 transition-colors rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer bg-indigo/20 group"
-                                        >
-                                            <Camera className="w-8 h-8 text-primary/50 group-hover:text-primary mb-2" />
-                                            <p className="font-medium">Open Camera</p>
-                                            <p className="text-xs text-foreground/40 mt-1">Live capture required for safety</p>
-                                        </button>
-                                    </div>
-                                    {selfieFile && (
-                                        <div className="mt-2 flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-indigo/30">
-                                                <img src={URL.createObjectURL(selfieFile)} alt="Selfie Preview" className="w-full h-full object-cover" />
-                                            </div>
-                                            <p className="text-xs text-foreground/50 truncate flex-1">Captured Selfie</p>
-                                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}
                 </AnimatePresence>
 
                 {/* Footer Navigation */}
@@ -381,10 +261,10 @@ export default function OnboardingPage() {
                         </button>
                     ) : <div />}
 
-                    {step < 3 ? (
+                    {step < 2 ? (
                         <button
                             onClick={handleNext}
-                            disabled={step === 1 && Object.keys(vibeAnswers).length < 4}
+                            disabled={step === 1 && (vibeAnswers.length < 3 || vibeAnswers.length > 5)}
                             className="px-6 py-3 rounded-xl btn-gradient transition-all font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Next Step <ArrowRight className="w-4 h-4" />
@@ -392,29 +272,14 @@ export default function OnboardingPage() {
                     ) : (
                         <button
                             onClick={handleFinish}
-                            disabled={loading || !studentIdFile || !selfieFile}
-                            className="px-8 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 transition-colors font-medium flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.3)] disabled:opacity-50"
+                            disabled={loading}
+                            className="px-8 py-3 rounded-xl btn-gradient font-medium flex items-center gap-2 disabled:opacity-50"
                         >
-                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Submit for Verification"}
+                            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Complete Profile"}
                         </button>
                     )}
                 </div>
             </div>
-
-            {/* Camera Capture Modal */}
-            <AnimatePresence>
-                {activeCamera && (
-                    <CameraCapture
-                        title={activeCamera === "id" ? "Capture Student ID" : "Capture Verification Selfie"}
-                        onCapture={(file) => {
-                            if (activeCamera === "id") setStudentIdFile(file);
-                            else setSelfieFile(file);
-                            setActiveCamera(null);
-                        }}
-                        onClose={() => setActiveCamera(null)}
-                    />
-                )}
-            </AnimatePresence>
         </main>
     );
 }
