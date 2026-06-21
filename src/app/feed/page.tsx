@@ -377,7 +377,7 @@ export default function FeedPage() {
                                 </div>
                                 <h2 className="text-2xl font-bold text-white mb-3">You've seen everyone!</h2>
                                 <p className="text-sm leading-relaxed max-w-xs mx-auto text-foreground/70">
-                                    You've seen everyone on campus for now! Drop a new anonymous confession on the Vibes feed to catch someone's attention.
+                                    You've seen everyone on campus for now! Drop a new anonymous confession on the feed to catch someone's eye.
                                 </p>
                                 <button
                                     onClick={() => router.push("/vibes")}
