@@ -16,7 +16,6 @@ export default function FeedPage() {
     const [matchModal, setMatchModal] = useState<any>(null);
     const [showProfileModal, setShowProfileModal] = useState(false);
     const [selectedProfileStories, setSelectedProfileStories] = useState<any[]>([]);
-    const [selectedProfileStories, setSelectedProfileStories] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, setIsSearching] = useState(false);
