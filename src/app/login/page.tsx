@@ -36,7 +36,6 @@ export default function LoginPage() {
                 .single();
 
             // After successful login, redirect to the originally requested page if present
-            const { data: { session } } = await supabase.auth.getUser();
             // Use the 'next' query parameter from the hook (already captured above)
             if (next) {
                 router.push(next);
