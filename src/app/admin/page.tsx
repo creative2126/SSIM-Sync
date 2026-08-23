@@ -91,6 +91,7 @@ export default function AdminDashboard() {
                 verification_status: priv.verification_status || pub.verification_status || "pending",
                 alias: pub.alias || "Incomplete Setup",
                 is_demo: pub.is_demo || false,
+                is_pwa_installed: pub.is_pwa_installed || false,
                 vibe_scores: pub.vibe_scores || {}
             };
         });
@@ -433,7 +434,7 @@ export default function AdminDashboard() {
                     )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-12">
                     <div className="glass-panel p-6 rounded-3xl border border-white/5 flex flex-col gap-2">
                         <div className="flex items-center justify-between">
                             <p className="text-[10px] uppercase tracking-widest text-foreground/40 font-bold">Total Students</p>
@@ -465,7 +466,28 @@ export default function AdminDashboard() {
                         </div>
                         <p className="text-3xl font-black text-white">{pendingUsers.length}</p>
                     </div>
+
+                    {/* PWA App Users */}
+                    <div className="glass-panel p-6 rounded-3xl border border-violet-500/20 bg-violet-500/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-violet-400/70 font-bold">App (PWA)</p>
+                            <span className="text-lg">📱</span>
+                        </div>
+                        <p className="text-3xl font-black text-white">{allUsers.filter(u => u.is_pwa_installed).length}</p>
+                        <p className="text-[9px] text-violet-400/50 font-bold uppercase tracking-widest">Installed to Home Screen</p>
+                    </div>
+
+                    {/* Browser Users */}
+                    <div className="glass-panel p-6 rounded-3xl border border-sky-500/20 bg-sky-500/5 flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <p className="text-[10px] uppercase tracking-widest text-sky-400/70 font-bold">Browser</p>
+                            <span className="text-lg">🌐</span>
+                        </div>
+                        <p className="text-3xl font-black text-white">{allUsers.filter(u => !u.is_pwa_installed).length}</p>
+                        <p className="text-[9px] text-sky-400/50 font-bold uppercase tracking-widest">Using via Web Browser</p>
+                    </div>
                 </div>
+
 
                 <div className="mb-12">
                     <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={() => setShowPopulation(!showPopulation)}>
@@ -503,6 +525,7 @@ export default function AdminDashboard() {
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Student (Real Name)</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Status</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Type</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Platform</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-foreground/40">Vibe Score</th>
                                     </tr>
                                 </thead>
@@ -543,6 +566,17 @@ export default function AdminDashboard() {
                                                     ) : (
                                                         <span className="px-2.5 py-1 rounded-lg bg-white/5 text-white/40 border border-white/10 text-[9px] font-black uppercase tracking-wider">
                                                             Real
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    {user.is_pwa_installed ? (
+                                                        <span className="px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
+                                                            📱 App
+                                                        </span>
+                                                    ) : (
+                                                        <span className="px-2.5 py-1 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20 text-[9px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
+                                                            🌐 Browser
                                                         </span>
                                                     )}
                                                 </td>

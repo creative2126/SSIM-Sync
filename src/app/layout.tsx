@@ -30,6 +30,7 @@ import Navigation from "@/components/Navigation";
 import AccessGuard from "@/components/AccessGuard";
 import BroadcastBanner from "@/components/BroadcastBanner";
 import PushInitializer from "@/components/PushInitializer";
+import PwaTracker from "@/components/PwaTracker";
 
 export default function RootLayout({
   children,
@@ -44,6 +45,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-midnight text-foreground">
         <AccessGuard />
         <PushInitializer />
+        <PwaTracker />
         <BroadcastBanner />
         <Navigation />
         <main className="flex-1 pb-24 md:pb-0 md:pt-20">

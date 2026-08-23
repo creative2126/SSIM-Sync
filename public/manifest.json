@@ -2,7 +2,7 @@
   "name": "SSIM Sync",
   "short_name": "SSIM Sync",
   "description": "A private, verified social discovery platform for SSIM students.",
-  "start_url": "/",
+  "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#0D0E12",
   "theme_color": "#0D0E12",
