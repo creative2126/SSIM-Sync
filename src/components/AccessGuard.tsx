@@ -62,7 +62,15 @@ export default function AccessGuard() {
     };
 
     // Don't block public pages
-    if (pathname === "/" || pathname === "/login" || pathname === "/signup") return null;
+    if (
+        pathname === "/" ||
+        pathname === "/login" ||
+        pathname === "/signup" ||
+        pathname === "/download" ||
+        pathname.startsWith("/vibes/")
+    ) {
+        return null;
+    }
 
     if (loading) return null; // Silent load
 
