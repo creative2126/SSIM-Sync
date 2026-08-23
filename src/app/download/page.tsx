@@ -6,6 +6,8 @@ import Link from "next/link";
 
 export default function DownloadPage() {
     const [deviceType, setDeviceType] = useState<"android" | "ios" | "desktop">("android");
+    const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+    const [isInstallable, setIsInstallable] = useState(false);
 
     useEffect(() => {
         const ua = navigator.userAgent.toLowerCase();
@@ -16,7 +18,42 @@ export default function DownloadPage() {
         } else {
             setDeviceType("desktop");
         }
+
+        // Listen for the PWA install prompt event
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault();
+            setDeferredPrompt(e);
+            setIsInstallable(true);
+        };
+
+        window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+
+        // Check if already installed
+        if (window.matchMedia("(display-mode: standalone)").matches) {
+            setIsInstallable(false);
+        }
+
+        return () => {
+            window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+        };
     }, []);
+
+    const handleInstallClick = async () => {
+        if (!deferredPrompt) {
+            // If prompt is not available, alert or guide them
+            alert("To install, please use the browser menu (Add to Home Screen) as detailed in the guide below.");
+            return;
+        }
+
+        deferredPrompt.prompt();
+
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log(`User response to install prompt: ${outcome}`);
+
+        // We can only use the prompt once, clear it
+        setDeferredPrompt(null);
+        setIsInstallable(false);
+    };
 
     const shareApp = async () => {
         const shareUrl = window.location.origin + "/download";
@@ -64,14 +101,23 @@ export default function DownloadPage() {
                     </div>
 
                     <h1 className="text-2xl font-black text-white mb-2">Get the App</h1>
-                    <p className="text-foreground/60 text-sm leading-relaxed mb-6">
+                    <p className="text-foreground/60 text-sm leading-relaxed mb-8">
                         Install SSIM Sync directly to your home screen. No app store downloads, fast setup, and native push notifications.
                     </p>
+
+                    {/* Trigger Button */}
+                    <button
+                        onClick={handleInstallClick}
+                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#9B00E8] to-[#FF2A6D] text-white font-black text-sm text-center uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:scale-102 transition-transform mb-8"
+                    >
+                        <Download className="w-4 h-4 animate-bounce" />
+                        Download & Install App Now
+                    </button>
 
                     {/* Step-by-step instructions based on device */}
                     <div className="bg-black/20 rounded-2xl p-6 text-left border border-white/5 space-y-5">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">
-                            Installation Guide
+                            Alternative Guide (If button does not trigger)
                         </p>
 
                         {deviceType === "ios" && (
@@ -102,19 +148,13 @@ export default function DownloadPage() {
                                 <div className="flex gap-4 items-start">
                                     <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">1</div>
                                     <p className="text-xs text-foreground/80">
-                                        Wait for the browser popup at the bottom of the screen.
+                                        Tap Chrome's <strong className="text-white">three-dot menu</strong> next to the URL bar.
                                     </p>
                                 </div>
                                 <div className="flex gap-4 items-start">
                                     <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">2</div>
                                     <p className="text-xs text-foreground/80">
-                                        Tap <strong className="text-white">"Install"</strong> or <strong className="text-white">"Add to Home Screen"</strong>.
-                                    </p>
-                                </div>
-                                <div className="flex gap-4 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">3</div>
-                                    <p className="text-xs text-foreground/80">
-                                        If it doesn't show, tap Chrome's <strong className="text-white">three-dot menu</strong> next to the URL bar and select <strong className="text-white">"Install app"</strong>.
+                                        Select <strong className="text-white">"Install app"</strong> or <strong className="text-white">"Add to Home screen"</strong>.
                                     </p>
                                 </div>
                             </div>
@@ -134,12 +174,6 @@ export default function DownloadPage() {
                                         Click the <strong className="text-white">Install</strong> icon (usually a small screen with an arrow).
                                     </p>
                                 </div>
-                                <div className="flex gap-4 items-start">
-                                    <div className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-white/80 shrink-0">3</div>
-                                    <p className="text-xs text-foreground/80">
-                                        Confirm the installation to add the app to your desktop.
-                                    </p>
-                                </div>
                             </div>
                         )}
                     </div>
@@ -149,9 +183,9 @@ export default function DownloadPage() {
                 <div className="flex flex-col gap-3">
                     <button
                         onClick={shareApp}
-                        className="w-full py-4 rounded-2xl bg-gradient-to-r from-[#9B00E8] to-[#FF2A6D] text-white font-black text-sm text-center uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:scale-105 transition-transform"
+                        className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-sm text-center uppercase tracking-widest shadow-xl flex items-center justify-center gap-2 hover:scale-105 transition-transform"
                     >
-                        <Share2 className="w-4 h-4" />
+                        <Share2 className="w-4 h-4 text-primary" />
                         Share App With Friends 🚀
                     </button>
                     <Link
