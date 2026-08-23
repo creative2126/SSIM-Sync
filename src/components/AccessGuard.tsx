@@ -9,6 +9,7 @@ import { ShieldAlert, LogOut, Loader2 } from "lucide-react";
 export default function AccessGuard() {
     const pathname = usePathname();
     const router = useRouter();
+    const [hasSession, setHasSession] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -16,9 +17,12 @@ export default function AccessGuard() {
         const checkStatus = async () => {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) {
+                setHasSession(false);
                 setLoading(false);
                 return;
             }
+            setHasSession(true);
+
 
             const { data, error } = await supabase
                 .from("profiles_public")
@@ -61,16 +65,22 @@ export default function AccessGuard() {
         router.push("/login");
     };
 
-    // Don't block public pages
+    // Public pages that should bypass the guard
     if (
         pathname === "/" ||
         pathname === "/login" ||
         pathname === "/signup" ||
-        pathname === "/download" ||
-        pathname.startsWith("/vibes/")
+        pathname === "/download"
     ) {
         return null;
     }
+
+    // If the user is not signed in, redirect to login
+    if (!hasSession) {
+        router.push("/login");
+        return null;
+    }
+
 
     if (loading) return null; // Silent load
 

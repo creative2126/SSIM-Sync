@@ -38,6 +38,18 @@ export default function DownloadPage() {
         };
     }, []);
 
+// Automatically trigger the install prompt after a short delay (2 seconds)
+// if the browser has fired the beforeinstallprompt event.
+useEffect(() => {
+  if (deferredPrompt) {
+    const timer = setTimeout(() => {
+      // Re‑use the install click handler
+      handleInstallClick();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }
+}, [deferredPrompt]);
+
     const handleInstallClick = async () => {
         if (!deferredPrompt) {
             // If prompt is not available, alert or guide them
