@@ -26,6 +26,7 @@ export default function AdminDashboard() {
     const [showVibes, setShowVibes] = useState(false);
     const [showChats, setShowChats] = useState(false);
     const [showPopulation, setShowPopulation] = useState(false);
+    const [showPwaUsers, setShowPwaUsers] = useState(false);
     const [selectedChatUser, setSelectedChatUser] = useState<any | null>(null);
 
 
@@ -488,6 +489,74 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
+                {/* PWA Users Section */}
+                <div className="mb-12">
+                    <div
+                        className="flex items-center justify-between mb-6 cursor-pointer group"
+                        onClick={() => setShowPwaUsers(!showPwaUsers)}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
+                                <span className="text-lg leading-none">📱</span>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-white group-hover:text-violet-400 transition-colors">
+                                    App Users (PWA Installed)
+                                </h2>
+                                <p className="text-foreground/40 text-xs">
+                                    Click to {showPwaUsers ? 'hide' : 'view'} students using the installed app
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="px-3 py-1.5 rounded-full bg-violet-500/10 text-violet-400 text-xs font-black border border-violet-500/20">
+                                {allUsers.filter(u => u.is_pwa_installed).length} students
+                            </span>
+                            <button className="px-4 py-2 rounded-lg bg-violet-500/20 text-violet-400 text-xs font-bold uppercase tracking-widest hover:bg-violet-500/30 transition-all border border-violet-500/30">
+                                {showPwaUsers ? 'Close' : 'Open'}
+                            </button>
+                        </div>
+                    </div>
+
+                    {showPwaUsers && (
+                        <div className="glass-panel rounded-[2rem] border border-violet-500/10 overflow-hidden">
+                            {allUsers.filter(u => u.is_pwa_installed).length === 0 ? (
+                                <div className="p-12 text-center text-foreground/30 italic text-sm">
+                                    No students have installed the PWA yet.
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-white/5">
+                                    {allUsers.filter(u => u.is_pwa_installed).map((user, idx) => (
+                                        <div key={user.id} className="px-6 py-4 flex items-center justify-between hover:bg-white/[0.02] transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-foreground/20 text-xs font-mono w-6">{idx + 1}</span>
+                                                <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center font-bold text-violet-400 border border-violet-500/20 text-lg uppercase">
+                                                    {user.alias?.[0]}
+                                                </div>
+                                                <div className="flex flex-col">
+                                                    <span className="font-bold text-white text-sm">{user.alias}</span>
+                                                    <span className="text-[10px] text-foreground/40 italic">{user.real_name}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                                                    user.verification_status === 'verified'
+                                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                                }`}>
+                                                    {user.verification_status}
+                                                </span>
+                                                <span className="px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 border border-violet-500/20 text-[9px] font-black uppercase tracking-wider">
+                                                    📱 App
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
 
                 <div className="mb-12">
                     <div className="flex items-center justify-between mb-6 cursor-pointer group" onClick={() => setShowPopulation(!showPopulation)}>
