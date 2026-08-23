@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { Loader2, Zap, Send, UserCircle2, MessageSquare, X, Heart, Shield, ShieldCheck, AlertCircle, MessageCircle } from "lucide-react";
+import { Loader2, Zap, Send, UserCircle2, MessageSquare, X, Heart, Shield, ShieldCheck, AlertCircle, MessageCircle, Share2 } from "lucide-react";
 import { checkContentSafety } from "@/lib/utils/safety";
 
 const getAvatarColor = (alias: string) => {
@@ -327,6 +327,34 @@ export default function VibesPage() {
         }
     };
 
+    const shareVibe = async (vibe: any) => {
+        const appUrl = window.location.origin;
+        const shareText = `"${vibe.content}"\n\n— Anonymous @ SSIM Sync\nJoin the campus: ${appUrl}`;
+
+        // Try native Web Share API first (works on Android/iOS)
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: "Campus Vibe — SSIM Sync",
+                    text: shareText,
+                    url: appUrl
+                });
+                return;
+            } catch (e) {
+                // User cancelled — do nothing
+                return;
+            }
+        }
+
+        // Fallback: copy to clipboard
+        try {
+            await navigator.clipboard.writeText(shareText);
+            alert("Vibe copied to clipboard! Paste it anywhere.");
+        } catch {
+            alert("Share not supported on this device.");
+        }
+    };
+
     if (loading && vibes.length === 0) return <div className="min-h-screen bg-midnight flex items-center justify-center"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>;
 
     return (
@@ -445,6 +473,13 @@ export default function VibesPage() {
                                 >
                                     <MessageSquare className="w-3.5 h-3.5" />
                                     {vibe.vibe_comments?.[0]?.count || 0}
+                                </button>
+                                <button
+                                    onClick={() => shareVibe(vibe)}
+                                    className="w-12 py-3.5 rounded-2xl bg-white/5 hover:bg-primary/20 text-foreground/40 hover:text-primary font-bold text-xs border border-white/5 hover:border-primary/30 transition-all active:scale-95 flex items-center justify-center"
+                                    title="Share this vibe"
+                                >
+                                    <Share2 className="w-4 h-4" />
                                 </button>
                             </div>
 
