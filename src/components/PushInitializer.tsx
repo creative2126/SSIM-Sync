@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bell, BellOff, X } from "lucide-react";
+import { Bell, X } from "lucide-react";
 
 const VAPID_PUBLIC_KEY = "BGE1BpYyWIAGEq4dyHQoVYY4JZ-3ZYr2z28kEpq0Brsnkt9uS0it5IHuLXGkZBs71dJQhSqgVZH05P7fdEUFuGw";
 
@@ -23,38 +23,47 @@ export default function PushInitializer() {
     const [status, setStatus] = useState<"idle" | "loading" | "done" | "denied">("idle");
 
     useEffect(() => {
-        // Only show the prompt if:
-        // 1. Service workers and push are supported
-        // 2. Permission hasn't been granted yet
-        // 3. User hasn't dismissed before
         if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-        if (localStorage.getItem("push_prompt_dismissed")) return;
 
-        const checkPermission = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+        const checkPermission = async (session: any) => {
             if (!session) return;
+
+            // If already dismissed previously, don't show the prompt
+            if (localStorage.getItem("push_prompt_dismissed")) return;
 
             if (Notification.permission === "granted") {
                 // Already granted — silently register in background
-                await registerAndSubscribe();
+                await registerAndSubscribe(session);
             } else if (Notification.permission === "default") {
                 // Not yet asked — show our friendly prompt after 3 seconds
                 setTimeout(() => setShowPrompt(true), 3000);
             }
-            // If "denied", do nothing
         };
 
-        checkPermission();
+        // Check initially
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            checkPermission(session);
+        });
+
+        // Listen for auth events (e.g. logging in)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            if (session) {
+                checkPermission(session);
+            }
+        });
+
+        return () => {
+            subscription.unsubscribe();
+        };
     }, []);
 
-    const registerAndSubscribe = async () => {
+    const registerAndSubscribe = async (session: any) => {
         try {
+            if (!session) return;
+
             // Register SW and wait for it to be fully active
             const registration = await navigator.serviceWorker.register("/sw.js");
             await navigator.serviceWorker.ready;
-
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) return;
 
             // Get or create push subscription
             let subscription = await registration.pushManager.getSubscription();
@@ -86,7 +95,8 @@ export default function PushInitializer() {
         const permission = await Notification.requestPermission();
         if (permission === "granted") {
             setStatus("done");
-            await registerAndSubscribe();
+            const { data: { session } } = await supabase.auth.getSession();
+            await registerAndSubscribe(session);
             setTimeout(() => setShowPrompt(false), 1500);
         } else {
             setStatus("denied");
