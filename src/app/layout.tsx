@@ -15,6 +15,15 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "SSIM Sync | Campus Discovery",
   description: "A private, verified social discovery platform for SSIM students.",
+  manifest: "/manifest.json",
+};
+
+export const viewport = {
+  themeColor: "#0D0E12",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 import Navigation from "@/components/Navigation";
