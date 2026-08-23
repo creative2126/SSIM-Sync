@@ -328,28 +328,27 @@ export default function VibesPage() {
     };
 
     const shareVibe = async (vibe: any) => {
-        const appUrl = window.location.origin;
-        const shareText = `"${vibe.content}"\n\n— Anonymous @ SSIM Sync\nJoin the campus: ${appUrl}`;
+        const vibeUrl = `${window.location.origin}/vibes/${vibe.id}`;
+        const shareText = `"${vibe.content}"\n\n— Anonymous @ SSIM Sync`;
 
-        // Try native Web Share API first (works on Android/iOS)
+        // Try native Web Share API first (opens Instagram, WhatsApp, etc.)
         if (navigator.share) {
             try {
                 await navigator.share({
                     title: "Campus Vibe — SSIM Sync",
                     text: shareText,
-                    url: appUrl
+                    url: vibeUrl
                 });
                 return;
             } catch (e) {
-                // User cancelled — do nothing
-                return;
+                return; // User cancelled
             }
         }
 
-        // Fallback: copy to clipboard
+        // Fallback: copy the exact vibe link to clipboard
         try {
-            await navigator.clipboard.writeText(shareText);
-            alert("Vibe copied to clipboard! Paste it anywhere.");
+            await navigator.clipboard.writeText(vibeUrl);
+            alert("Vibe link copied! Paste it on Instagram or WhatsApp.");
         } catch {
             alert("Share not supported on this device.");
         }
