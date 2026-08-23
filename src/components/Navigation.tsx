@@ -10,8 +10,8 @@ export default function Navigation() {
     const pathname = usePathname();
     const { unreadCount } = useNotifications();
 
-    // Hide navigation on landing, login, and signup pages
-    if (pathname === "/" || pathname === "/login" || pathname === "/signup") return null;
+    // Hide navigation on landing, login, signup, and public vibe detail pages
+    if (pathname === "/" || pathname === "/login" || pathname === "/signup" || pathname.startsWith("/vibes/")) return null;
 
     const tabs = [
         { name: "Discover", icon: <Search className="w-5 h-5" />, path: "/feed" },
