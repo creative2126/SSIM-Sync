@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { Loader2, Mail, Lock, ArrowRight, ShieldCheck } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 export default function LoginPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const next = searchParams.get('next');
     const [loading, setLoading] = useState(false);
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -33,10 +34,19 @@ export default function LoginPage() {
                 .eq("id", (await supabase.auth.getUser()).data.user?.id)
                 .single();
 
-            if (profile?.alias && !profile.alias.startsWith("User_")) {
-                router.push("/vibes");
+            // After successful login, redirect to the originally requested page if present
+            const { data: { session } } = await supabase.auth.getUser();
+// Use the 'next' query parameter from the hook (already captured above)
+            if (next) {
+                router.push(next);
+                return;
+            }
+
+            // Fallback to existing onboarding/vibes logic
+            if (profile?.alias && !profile.alias.startsWith('User_')) {
+                router.push('/vibes');
             } else {
-                router.push("/onboarding");
+                router.push('/onboarding');
             }
         }
     };
@@ -55,10 +65,7 @@ export default function LoginPage() {
                 <div className="text-center mb-10">
                     <div className="inline-flex p-4 bg-primary/10 rounded-2xl border border-primary/20 mb-6 shadow-[0_0_30px_rgba(109,93,254,0.2)]">
                         <ShieldCheck className="w-10 h-10 text-primary" />
-                    </div>
-                    <h1 className="text-4xl font-bold text-white mb-2 tracking-tight">Welcome Back</h1>
-                    <p className="text-foreground/50 font-medium">Continue your anonymous journey</p>
-                </div>
+<div className="text-center mb-4"><p className="text-sm text-foreground/70">You need to sign in to view the requested page.</p></div>
 
                 <form onSubmit={handleLogin} className="glass-panel p-10 rounded-[2.5rem] border border-white/5 shadow-2xl space-y-6">
                     <div className="space-y-2">

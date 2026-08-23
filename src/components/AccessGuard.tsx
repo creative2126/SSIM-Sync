@@ -75,9 +75,10 @@ export default function AccessGuard() {
         return null;
     }
 
-    // If the user is not signed in, redirect to login
+    // If the user is not signed in, redirect to login with return URL
     if (!hasSession) {
-        router.push("/login");
+        const encoded = encodeURIComponent(pathname);
+        router.push(`/login?next=${encoded}`);
         return null;
     }
 
