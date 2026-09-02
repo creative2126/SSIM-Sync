@@ -3,26 +3,32 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { usePathname, useRouter } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
-import { ShieldAlert, LogOut, Loader2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { ShieldAlert, LogOut } from "lucide-react";
 
 export default function AccessGuard() {
     const pathname = usePathname();
     const router = useRouter();
-    const [hasSession, setHasSession] = useState(false);
+    const [hasSession, setHasSession] = useState<boolean | null>(null);
     const [status, setStatus] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const checkStatus = async () => {
-            const { data: { session } } = await supabase.auth.getSession();
+        let isMounted = true;
+
+        const checkStatus = async (session: any) => {
             if (!session) {
-                setHasSession(false);
-                setLoading(false);
+                if (isMounted) {
+                    setHasSession(false);
+                    setStatus(null);
+                    setLoading(false);
+                }
                 return;
             }
-            setHasSession(true);
 
+            if (isMounted) {
+                setHasSession(true);
+            }
 
             const { data, error } = await supabase
                 .from("profiles_public")
@@ -30,15 +36,25 @@ export default function AccessGuard() {
                 .eq("id", session.user.id)
                 .single();
 
-            if (!error && data) {
-                setStatus(data.verification_status);
+            if (isMounted) {
+                if (!error && data) {
+                    setStatus(data.verification_status);
+                }
+                setLoading(false);
             }
-            setLoading(false);
         };
 
-        checkStatus();
+        // 1. Initial getSession call to restore auth state from localStorage immediately
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            checkStatus(session);
+        });
 
-        // Optional: Listen for real-time status changes (Admin might reject while user is logged in)
+        // 2. Listen to onAuthStateChange so login/logout updates state without delay
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            checkStatus(session);
+        });
+
+        // 3. Realtime updates for admin rejection (subscribed once on mount)
         const channel = supabase
             .channel('status_guard')
             .on('postgres_changes', {
@@ -55,35 +71,44 @@ export default function AccessGuard() {
             .subscribe();
 
         return () => {
+            isMounted = false;
+            subscription.unsubscribe();
             supabase.removeChannel(channel);
         };
-    }, [pathname]);
+    }, []);
+
+    // Route guard effect: only redirect when loading is complete
+    useEffect(() => {
+        if (loading) return;
+
+        const isPublicPath =
+            pathname === "/" ||
+            pathname === "/login" ||
+            pathname === "/signup" ||
+            pathname === "/download";
+
+        if (!hasSession && !isPublicPath) {
+            const encoded = encodeURIComponent(pathname);
+            router.replace(`/login?next=${encoded}`);
+        }
+    }, [loading, hasSession, pathname, router]);
 
     const handleLogout = async () => {
         await supabase.auth.signOut();
         setStatus(null);
-        router.push("/login");
+        setHasSession(false);
+        router.replace("/login");
     };
 
-    // Public pages that should bypass the guard
-    if (
+    const isPublicPath =
         pathname === "/" ||
         pathname === "/login" ||
         pathname === "/signup" ||
-        pathname === "/download"
-    ) {
+        pathname === "/download";
+
+    if (isPublicPath || loading) {
         return null;
     }
-
-    // If the user is not signed in, redirect to login with return URL
-    if (!hasSession) {
-        const encoded = encodeURIComponent(pathname);
-        router.push(`/login?next=${encoded}`);
-        return null;
-    }
-
-
-    if (loading) return null; // Silent load
 
     if (status === "rejected") {
         return (

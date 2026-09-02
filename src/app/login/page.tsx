@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { motion } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,11 +15,20 @@ function LoginContent() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
 
+    // If user is already authenticated, redirect forward immediately
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+                router.replace(next || "/vibes");
+            }
+        });
+    }, [next, router]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data: authData, error } = await supabase.auth.signInWithPassword({
             email,
             password,
         });
@@ -27,27 +36,32 @@ function LoginContent() {
         if (error) {
             alert(error.message);
             setLoading(false);
-        } else {
-            // Check if onboarding is complete
+            return;
+        }
+
+        const userId = authData?.user?.id;
+        let profileAlias: string | null = null;
+
+        if (userId) {
             const { data: profile } = await supabase
                 .from("profiles_public")
                 .select("alias")
-                .eq("id", (await supabase.auth.getUser()).data.user?.id)
+                .eq("id", userId)
                 .single();
+            profileAlias = profile?.alias || null;
+        }
 
-            // After successful login, redirect to the originally requested page if present
-            // Use the 'next' query parameter from the hook (already captured above)
-            if (next) {
-                router.push(next);
-                return;
-            }
+        // If a specific target page was requested, redirect there
+        if (next) {
+            router.replace(next);
+            return;
+        }
 
-            // Fallback to existing onboarding/vibes logic
-            if (profile?.alias && !profile.alias.startsWith('User_')) {
-                router.push('/vibes');
-            } else {
-                router.push('/onboarding');
-            }
+        // Fallback to existing onboarding/vibes logic
+        if (profileAlias && !profileAlias.startsWith('User_')) {
+            router.replace('/vibes');
+        } else {
+            router.replace('/onboarding');
         }
     };
 
